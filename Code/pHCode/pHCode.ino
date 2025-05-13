@@ -41,7 +41,6 @@ void loop()
   {
     lastPrint = millis();
 
-
     // Read, Sort, Filter, Avg 
     for (int i = 0; i < 20; i++) // Get 20 readings
     {
@@ -72,6 +71,12 @@ void loop()
     float volt = avgval * ads.computeVolts(1); // for GAIN_ONE
     ph_act = m * volt + b; 
 
+    printData(ph_act, volt);
+  }
+}
+
+void printData(float ph_act, float volt)
+{
     Serial.print("pH Val: ");
     Serial.println(ph_act, 2);
     Serial.print("Volt Val: ");
@@ -86,12 +91,5 @@ void loop()
     lcd.print("V: ");
     lcd.print(volt, 3);  // Show voltage to 3 decimal places
     lcd.print("     ");
-  }
-  }
-}
-
-void printData(float ph, float volt)
-{
-  
 }
 
