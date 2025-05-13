@@ -3,18 +3,16 @@
 #define LIQUID_SENSOR_PIN 52
 #define GAS_SENSOR_PIN 2 
 #define VALVE_PIN 9 
-#define PH_SENSOR A1
 #define ADC_CONV_FACTOR (4.096 / 32768.0) // ADS1115 GAIN_ONE
 
 Adafruit_ADS1115 ads; 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 float ph1 = 4.00, v1 = 1.715;
 float ph2 = 7.00, v2 = 1.951;
 float ph3 = 10.00, v3 = 2.187;
 float m, b;
 
-// int pHsensor = A1;
 float buffer_arr[20], temp;
 float avgval;
 float ph_act;
@@ -47,9 +45,10 @@ void calculateSlope()
 
 void setup() 
 {
+  
   ads.begin();                 
   ads.setGain(GAIN_ONE);      
-  lcd.begin(16, 2);
+  lcd.begin(20, 4);
   lcd.backlight();
   lcd.setCursor(0, 0);
   lcd.print("pH Meter Ready");
