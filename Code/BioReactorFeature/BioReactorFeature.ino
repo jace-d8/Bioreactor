@@ -1,6 +1,6 @@
 #include <Adafruit_ADS1X15.h>
 #include <LiquidCrystal_I2C.h>
-#define LIQUID_SENSOR_PIN 52
+#define LIQUID_SENSOR_PIN 11
 #define GAS_SENSOR_PIN 2 
 #define VALVE_PIN 9 
 #define ADC_CONV_FACTOR (4.096 / 32768.0) // ADS1115 GAIN_ONE
@@ -56,7 +56,7 @@ void setup()
   lcd.clear();
   calculateSlope();
 
-  pinMode(LIQUID_SENSOR_PIN, INPUT);
+  pinMode(LIQUID_SENSOR_PIN, INPUT);  
   pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tubd
   pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
   Serial.begin(9600);
