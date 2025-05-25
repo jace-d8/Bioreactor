@@ -13,8 +13,7 @@ const unsigned long readInterval = 2000;  // 2 seconds
 // analog stick
 const int SW_pin = 53; // input for detecting whether the jotstick/button is pressed
 const int Y_pin = A15; // analog pin connected to Y output
-bool calibrateMenu = false;
-int selectedItem = -1;  // 0 = pH Probe 1, 1 = pH Probe 2
+
 
 bool blinkState = true;
 unsigned long lastBlinkTime = 0;
@@ -110,6 +109,8 @@ void loop()
 
 void lcdMenu()
 {
+  bool calibrateMenu = false;
+  int selectedItem = -1;  // 0 = pH Probe 1, 1 = pH Probe 2
   if(!digitalRead(SW_pin))
   {
     delay(200);  // debounce
@@ -124,13 +125,13 @@ void lcdMenu()
       lcd.setCursor(0, 0);
       lcd.print("Calibrate Probe:");
 
-      printMenuItem(0, 1, "pH 1", 0);
-      printMenuItem(0, 2, "pH 2", 1);
-      printMenuItem(0, 3, "pH 3", 2);
-      printMenuItem(6, 1, "ORP 1", 3);
-      printMenuItem(6, 2, "ORP 2", 4);
-      printMenuItem(6, 3, "ORP 3", 5);
-      printMenuItem(13, 2, "Cancel", 6);
+      printMenuItem(0, 1, "pH 1", 0, selectedItem);
+      printMenuItem(0, 2, "pH 2", 1, selectedItem);
+      printMenuItem(0, 3, "pH 3", 2, selectedItem);
+      printMenuItem(6, 1, "ORP 1", 3, selectedItem);
+      printMenuItem(6, 2, "ORP 2", 4, selectedItem);
+      printMenuItem(6, 3, "ORP 3", 5, selectedItem);
+      printMenuItem(13, 2, "Cancel", 6, selectedItem);
 
       if (!digitalRead(SW_pin)) {
         delay(200);  // debounce
@@ -170,45 +171,81 @@ void updateGlobalBlink() {
   }
 }
 
-void printMenuItem(int col, int row, const char* label, int itemIndex) {
+void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex) {
   lcd.setCursor(col, row);
-  if (selectedItem == itemIndex && blinkState) {
+  if (itemIndex == selectedIndex && blinkState) {
     lcd.print("      ");  // Blank line to simulate blinking
   } else {
     lcd.print(label);
   }
 }
 
-void calibrateProbe()
-{
+void calibrateProbe() {
   int bufferSelection = 0;
-  int calCount = true;
+  bool bufferCalibrated[3] = {false, false, false};
+  bool selecting = true;
+
   lcd.clear();
 
-  while (calCount < 3) {
+  while (selecting) {
     analogControl(bufferSelection);
+    updateGlobalBlink();
 
     lcd.setCursor(0, 0);
     lcd.print("Select Buffer:");
 
-    updateGlobalBlink();
-    printMenuItem(0, 1, "pH 4", 0);
-    printMenuItem(0, 2, "pH 7", 1);
-    printMenuItem(0, 3, "pH 10", 2);
+    printMenuItem(0, 1, "pH 4", 0, bufferSelection);
+    printMenuItem(0, 2, "pH 7", 1, bufferSelection);
+    printMenuItem(0, 3, "pH 10", 2, bufferSelection);
+    printMenuItem(10, 1, "Clear", 3, bufferSelection);  
+    printMenuItem(10, 2, "Cancel", 4, bufferSelection);
 
+    if (bufferCalibrated[0]) lcd.setCursor(6, 1), lcd.print("*");
+    if (bufferCalibrated[1]) lcd.setCursor(6, 2), lcd.print("*");
+    if (bufferCalibrated[2]) lcd.setCursor(6, 3), lcd.print("*");
+
+    
     if (!digitalRead(SW_pin)) {
       delay(200);
-      while (!digitalRead(SW_pin));
-      if (bufferSelection == 0) 
-      {
-        ph_sensor.send_cmd("Cal,low,4.00");
-        // printMenuItem(0, 5, "Calibrated", -1);
+      while (!digitalRead(SW_pin)); 
+
+      switch (bufferSelection) {
+        case 0:
+          ph_sensor.send_cmd("Cal,low,4.00");
+          bufferCalibrated[0] = true;
+          break;
+        case 1:
+          ph_sensor.send_cmd("Cal,mid,7.00");
+          bufferCalibrated[1] = true;
+          break;
+        case 2:
+          ph_sensor.send_cmd("Cal,high,10.00");
+          bufferCalibrated[2] = true;
+          break;
+        case 3: 
+          ph_sensor.send_cmd("Cal,clear");
+          bufferCalibrated[0] = bufferCalibrated[1] = bufferCalibrated[2] = false;
+          lcd.clear();
+          lcd.print("Calibration Cleared");
+          delay(1500);
+          lcd.clear();
+          break;
+        case 4:  
+          lcd.clear();
+          lcd.print("Cancelled");
+          delay(1000);
+          lcd.clear();
+          selecting = false;
+          break;
       }
-      else if (bufferSelection == 1) ph_sensor.send_cmd("Cal,mid,7.00");
-      else if (bufferSelection == 2) ph_sensor.send_cmd("Cal,high,10.00");
+    }
+    if (bufferCalibrated[0] && bufferCalibrated[1] && bufferCalibrated[2]) 
+    {
       lcd.clear();
-      delay(1000);
+      lcd.print("All Calibrated!");
+      delay(1500);
       lcd.clear();
+      selecting = false;
     }
   }
 }
