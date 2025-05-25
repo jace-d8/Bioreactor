@@ -56,7 +56,7 @@ void setup()
   lcd.clear();
   calculateSlope();
 
-  pinMode(LIQUID_SENSOR_PIN, INPUT);  
+  //pinMode(LIQUID_SENSOR_PIN, INPUT);  
   pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tubd
   pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
   Serial.begin(9600);

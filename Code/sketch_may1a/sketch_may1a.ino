@@ -2,7 +2,7 @@
 #include <LiquidCrystal_I2C.h>
 
 Adafruit_ADS1115 ads;  
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 float ph1 = 4.00, v1 = 1.715;
 float ph2 = 7.00, v2 = 1.951;
