@@ -1,6 +1,10 @@
 #include <Wire.h>
 #include <Ezo_i2c.h>
 #include <LiquidCrystal_I2C.h>
+#include <SPI.h>
+#include <SD.h>
+
+const int chipSelect = 10;
 
 Ezo_board ph_sensor(99, "PH");  // Change 99 if your sensor has a different I2C address
 LiquidCrystal_I2C lcd(0x27, 20, 4);
@@ -22,18 +26,55 @@ const unsigned long blinkInterval = 300;
 void setup()
 {
   Serial.begin(9600);
+
+  pinMode(53, OUTPUT);
   pinMode(SW_pin, INPUT);      //setup SW input
+  // pinMode(LIQUID_SENSOR_PIN, INPUT);  
+  // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tubd
+  // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
+
   digitalWrite(SW_pin, HIGH);  //reading button state:1=not pressed,0=pressed
   delay(100);
+
+  // SD Card Test
+  while (!Serial) {}
+
+  Serial.print("Initializing SD card...");
+
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Initialization failed!");
+    return;
+  }
+  Serial.println("Initialization done.");
+
+  File dataFile = SD.open("test.txt", FILE_WRITE);
+  if (dataFile) {
+    dataFile.println("Hello from SD card!");
+    dataFile.close();
+    Serial.println("Data written.");
+  } else {
+    Serial.println("Error opening file.");
+  } 
+
+  dataFile = SD.open("test.txt");
+  if (dataFile) {
+    Serial.println("Reading from test.txt:");
+    while (dataFile.available()) {
+      Serial.write(dataFile.read());
+    }
+    dataFile.close();
+  } else {
+    Serial.println("Error opening file for reading.");
+  }
+  // SD Card end
+
   Wire.begin();
   lcd.begin(20, 4);
   lcd.backlight();
   lcd.setCursor(0, 0);
   lcd.print("pH Meter Ready");
   delay(2000);
-  // pinMode(LIQUID_SENSOR_PIN, INPUT);  
-  // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tubd
-  // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
+
   lcd.clear();
 }
 
