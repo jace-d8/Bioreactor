@@ -11,7 +11,7 @@ unsigned long lastReadTime = 0;
 const unsigned long readInterval = 2000;  // 2 seconds
 
 // analog stick
-const int SW_pin = 53; // input for detecting whether the jotstick/button is pressed
+const int SW_pin = 23; // input for detecting whether the jotstick/button is pressed
 const int Y_pin = A15; // analog pin connected to Y output
 
 
@@ -35,7 +35,6 @@ void setup()
   // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tubd
   // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
   lcd.clear();
-  Serial.println("Automated pH reading every 2 seconds...");
 }
 
 void loop() 
@@ -131,7 +130,7 @@ void lcdMenu()
       printMenuItem(6, 1, "ORP 1", 3, selectedItem);
       printMenuItem(6, 2, "ORP 2", 4, selectedItem);
       printMenuItem(6, 3, "ORP 3", 5, selectedItem);
-      printMenuItem(13, 2, "Cancel", 6, selectedItem);
+      printMenuItem(13, 2, "Done", 6, selectedItem);
 
       if (!digitalRead(SW_pin)) {
         delay(200);  // debounce
@@ -198,7 +197,7 @@ void calibrateProbe() {
     printMenuItem(0, 2, "pH 7", 1, bufferSelection);
     printMenuItem(0, 3, "pH 10", 2, bufferSelection);
     printMenuItem(10, 1, "Clear", 3, bufferSelection);  
-    printMenuItem(10, 2, "Cancel", 4, bufferSelection);
+    printMenuItem(10, 2, "Done", 4, bufferSelection);
 
     if (bufferCalibrated[0]) lcd.setCursor(6, 1), lcd.print("*");
     if (bufferCalibrated[1]) lcd.setCursor(6, 2), lcd.print("*");
@@ -232,7 +231,7 @@ void calibrateProbe() {
           break;
         case 4:  
           lcd.clear();
-          lcd.print("Cancelled");
+          lcd.print("Returning");
           delay(1000);
           lcd.clear();
           selecting = false;
@@ -258,7 +257,7 @@ void printData(float ph_act)
   
     lcd.setCursor(0, 0);
     lcd.print("pH: ");
-    lcd.print(ph_act);
+    lcd.print(ph_act, 3); // to the thousandths
     lcd.print("     "); // Clear leftover digits
 
     // lcd.setCursor(0, 2);
