@@ -15,8 +15,8 @@ unsigned long lastReadTime = 0;
 const unsigned long readInterval = 2000;  // 2 seconds
 
 // analog stick
-const int SW_pin = 23; // input for detecting whether the jotstick/button is pressed
-const int Y_pin = A15; // analog pin connected to Y output
+const int SW_pin = 2; // input for detecting whether the jotstick/button is pressed
+const int Y_pin = A1; // analog pin connected to Y output
 
 
 bool blinkState = true;
@@ -26,45 +26,21 @@ const unsigned long blinkInterval = 300;
 void setup()
 {
   Serial.begin(9600);
+  Wire.setClock(400000);  // Set I2C speed to 400kHz
 
-  pinMode(53, OUTPUT);
-  pinMode(SW_pin, INPUT);      //setup SW input
+  pinMode(SW_pin, INPUT); //vSetup SW input
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
-  // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tubd
+  // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tube
   // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
 
-  digitalWrite(SW_pin, HIGH);  //reading button state:1=not pressed,0=pressed
+  digitalWrite(SW_pin, HIGH);  // Reading button state:1=not pressed,0=pressed
   delay(100);
 
   // SD Card Test
-  while (!Serial) {}
-
-  Serial.print("Initializing SD card...");
-
-  if (!SD.begin(chipSelect)) {
+  while (!Serial) {} // Waits for serial connection to open 
+  if (!SD.begin(chipSelect)) { // if 
     Serial.println("Initialization failed!");
     return;
-  }
-  Serial.println("Initialization done.");
-
-  File dataFile = SD.open("test.txt", FILE_WRITE);
-  if (dataFile) {
-    dataFile.println("Hello from SD card!");
-    dataFile.close();
-    Serial.println("Data written.");
-  } else {
-    Serial.println("Error opening file.");
-  } 
-
-  dataFile = SD.open("test.txt");
-  if (dataFile) {
-    Serial.println("Reading from test.txt:");
-    while (dataFile.available()) {
-      Serial.write(dataFile.read());
-    }
-    dataFile.close();
-  } else {
-    Serial.println("Error opening file for reading.");
   }
   // SD Card end
 
@@ -77,6 +53,9 @@ void setup()
 
   lcd.clear();
 }
+
+// analog stick: a0, d2
+// nano esp32 has 500x more memory and 15x more powerful, has a built in clock, wifi, and bluetooth
 
 void loop() 
 {
