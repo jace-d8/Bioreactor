@@ -6,7 +6,8 @@
 
 const int chipSelect = 10;
 
-Ezo_board ph_sensor(99, "PH");  // Change 99 if your sensor has a different I2C address
+Ezo_board orp_sensor(98, "ORP");  
+Ezo_board ph_sensor(99, "PH");  
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 char response[32];              // Buffer for response
 String inputString = "";  // For manual commands
@@ -28,12 +29,12 @@ void setup()
   Serial.begin(9600);
   Wire.setClock(400000);  // Set I2C speed to 400kHz
 
-  pinMode(SW_pin, INPUT); //vSetup SW input
+  pinMode(SW_pin, INPUT); // Setup SW input
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
   // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tube
   // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
 
-  digitalWrite(SW_pin, HIGH);  // Reading button state:1=not pressed,0=pressed
+  digitalWrite(SW_pin, HIGH);  // Reading button state: 1 = not pressed, 0 = pressed
   delay(100);
 
   // SD Card Test
@@ -50,12 +51,8 @@ void setup()
   lcd.setCursor(0, 0);
   lcd.print("pH Meter Ready");
   delay(2000);
-
   lcd.clear();
 }
-
-// analog stick: a0, d2
-// nano esp32 has 500x more memory and 15x more powerful, has a built in clock, wifi, and bluetooth
 
 void loop() 
 {
@@ -64,36 +61,27 @@ void loop()
   // is_gas_sensor = digitalRead(GAS_SENSOR_PIN); // is_open will be true if high voltage is read
   lcdMenu();
   if (millis() - lastReadTime >= readInterval) {
-    ph_sensor.send_cmd("R");         // Send read command
-    delay(900);                      // Wait for the sensor to respond
-    ph_sensor.receive_cmd(response, 32);  // Read response into buffer
-    float ph_value = atof(response);  // Convert char* to float
-    printData(ph_value);
 
+    float ph_val = readPH();  // Convert char* to float
+    float orp_val = readORP();
+    printData(ph_val, orp_val);
     lastReadTime = millis();
   }
+}
+float readPH()
+{
+  ph_sensor.send_cmd("R");         // Send read command
+  delay(900);                      // Wait for the sensor to respond
+  ph_sensor.receive_cmd(response, 32);  // Read response into buffer
+  return atof(response);
+}
 
-    // === Manual command input via Serial ===
-  // while (Serial.available()) {
-  //   char inChar = (char)Serial.read();
-  //   if (inChar == '\n') {
-  //     if (inputString.length() > 0) {
-  //       Serial.print("Sending command: ");
-  //       Serial.println(inputString);
-
-  //       ph_sensor.send_cmd(inputString.c_str());
-  //       delay(900);
-  //       ph_sensor.receive_cmd(response, 32);
-
-  //       Serial.print("Manual response: ");
-  //       Serial.println(response);
-
-  //       inputString = "";
-  //     }
-  //   } else if (inChar != '\r') {
-  //     inputString += inChar;
-  //   }
-  // }
+float readORP()
+{
+  orp_sensor.send_cmd("R");
+  delay(900);
+  orp_sensor.receive_cmd(response, 32);
+  return atof(response);
 }
 
 
@@ -129,7 +117,7 @@ void loop()
 void lcdMenu()
 {
   bool calibrateMenu = false;
-  int selectedItem = -1;  // 0 = pH Probe 1, 1 = pH Probe 2
+  int selectedItem = -1;  // 0 = pH Probe 1, 1 = pH Probe 2...
   if(!digitalRead(SW_pin))
   {
     delay(200);  // debounce
@@ -152,16 +140,24 @@ void lcdMenu()
       printMenuItem(6, 3, "ORP 3", 5, selectedItem);
       printMenuItem(13, 2, "Done", 6, selectedItem);
 
-      if (!digitalRead(SW_pin)) {
-        delay(200);  // debounce
-        while (!digitalRead(SW_pin));  // wait until released
-        if (selectedItem == 0) {
-          calibrateProbe();
-        } else if (selectedItem == 6) {
-          calibrateMenu = false;
-          lcd.clear();
-        }
-      }
+      isPressed(calibrateMenu, selectedItem);
+    }
+  }
+}
+
+void isPressed(bool &calibrateMenu, int selectedItem)
+{
+  if (!digitalRead(SW_pin)) 
+  {
+    delay(200);  // debounce
+    while (!digitalRead(SW_pin));  // wait until released
+    if (selectedItem == 0)
+    {
+      calibrateProbe();
+    } else if (selectedItem == 6) 
+    {
+      calibrateMenu = false;
+      lcd.clear();
     }
   }
 }
@@ -218,6 +214,10 @@ void calibrateProbe() {
     printMenuItem(0, 3, "pH 10", 2, bufferSelection);
     printMenuItem(10, 1, "Clear", 3, bufferSelection);  
     printMenuItem(10, 2, "Done", 4, bufferSelection);
+    // lcd.setCursor(10, 3);
+    // lcd.print("pH: ");
+    // lcd.print(ph_val, 3); // to the thousandths
+
 
     if (bufferCalibrated[0]) lcd.setCursor(6, 1), lcd.print("*");
     if (bufferCalibrated[1]) lcd.setCursor(6, 2), lcd.print("*");
@@ -269,7 +269,7 @@ void calibrateProbe() {
   }
 }
 
-void printData(float ph_act)
+void printData(float ph_val, float orp_val)
 {
   //   float ph_value = atof(ph_str);  // Convert char* to float
     // Serial.print("pH Val: ");
@@ -277,8 +277,13 @@ void printData(float ph_act)
   
     lcd.setCursor(0, 0);
     lcd.print("pH: ");
-    lcd.print(ph_act, 3); // to the thousandths
+    lcd.print(ph_val, 3); // to the thousandths
     lcd.print("     "); // Clear leftover digits
+
+    lcd.setCursor(0, 1);
+    lcd.print("ORP: ");
+    lcd.print(orp_val, 0);
+    lcd.print(" mV     ");
 
     // lcd.setCursor(0, 2);
     // lcd.print("Count: ");
