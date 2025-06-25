@@ -4,7 +4,7 @@
 #include <SPI.h>
 #include <SD.h>
 
-const int chipSelect = 10;
+// const int chipSelect = 10;
 
 Ezo_board orp_sensor(98, "ORP");  
 Ezo_board ph_sensor(99, "PH");  
@@ -16,20 +16,23 @@ unsigned long lastReadTime = 0;
 const unsigned long readInterval = 2000;  // 2 seconds
 
 // analog stick
-const int SW_pin = 5; // D2: input for detecting whether the jotstick/button is pressed
-const int Y_pin = 2; // A1: analog pin connected to Y output 
+const int SW_pin = D2; // D2: input for detecting whether the jotstick/button is pressed
+const int Y_pin = A1; // A1: analog pin connected to Y output 
 
 
 bool blinkState = true;
 unsigned long lastBlinkTime = 0;
 const unsigned long blinkInterval = 300;
 
+float ph_val = 0;
+float orp_val = 0; 
+
 // Note: Pinout for nano eps32 requires pin number changes
 
 void setup()
 {
   Serial.begin(9600);
-  Wire.setClock(400000);  // Set I2C speed to 100kHz
+  Wire.setClock(1000000);  // Set I2C speed to 100kHz
 
   
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
@@ -66,11 +69,11 @@ void loop()
   // is_liquid_detected = digitalRead(LIQUID_SENSOR_PIN); // will become true if sensor detects liquid 
   // is_gas_sensor = digitalRead(GAS_SENSOR_PIN); // is_open will be true if high voltage is read
   lcdMenu();
-  if (millis() - lastReadTime >= readInterval) {
-
-    float ph_val = readPH();  // Convert char* to float
-    float orp_val = readORP();
+  if (millis() - lastReadTime >= readInterval) 
+  {
     printData(ph_val, orp_val);
+    ph_val = readPH();  // Convert char* to float
+    orp_val = readORP();
     lastReadTime = millis();
   }
 }
@@ -175,18 +178,23 @@ void isPressed(bool &calibrateMenu, int selectedItem)
 void analogControl(int& selectedItem)
 {
   int yVal = analogRead(Y_pin);
-  if (yVal < 400)
+
+  // Dead zone around the resting value (~1980)
+  const int deadZone = 400;
+
+  if (yVal < 1980 - deadZone) 
   {  // Up
-    if (selectedItem >= 1)
+    if (selectedItem > 0)
       selectedItem--;
-    delay(200); // Debounce movement
-  } else if (yVal > 600)
+    delay(200); // Debounce
+  } else if (yVal > 1980 + deadZone) 
   {  // Down
-    if (selectedItem <= 5)
+    if (selectedItem < 6)  // 6 is your "Done" item
       selectedItem++;
-    delay(200);
+    delay(200); // Debounce
   }
 }
+
 
 void updateGlobalBlink() {
   unsigned long currentMillis = millis();
