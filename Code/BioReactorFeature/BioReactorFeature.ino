@@ -29,14 +29,17 @@ const unsigned long blinkInterval = 300;
 void setup()
 {
   Serial.begin(9600);
-  Wire.setClock(400000);  // Set I2C speed to 400kHz
+  Wire.setClock(400000);  // Set I2C speed to 100kHz
 
-  pinMode(SW_pin, INPUT); // Setup SW input
+  
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
   // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tube
   // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
 
-  digitalWrite(SW_pin, HIGH);  // Reading button state: 1 = not pressed, 0 = pressed
+  //pinMode(SW_pin, INPUT); // Setup SW input
+  //digitalWrite(SW_pin, HIGH);  // Reading button state: 1 = not pressed, 0 = pressed
+  // The above two lines are for normal arduino, the below is for the nano esp32
+  pinMode(SW_pin, INPUT_PULLUP);  
   delay(100);
 
   // SD Card Test
