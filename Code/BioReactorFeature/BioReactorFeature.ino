@@ -16,13 +16,15 @@ unsigned long lastReadTime = 0;
 const unsigned long readInterval = 2000;  // 2 seconds
 
 // analog stick
-const int SW_pin = 2; // input for detecting whether the jotstick/button is pressed
-const int Y_pin = A1; // analog pin connected to Y output
+const int SW_pin = 5; // D2: input for detecting whether the jotstick/button is pressed
+const int Y_pin = 2; // A1: analog pin connected to Y output 
 
 
 bool blinkState = true;
 unsigned long lastBlinkTime = 0;
 const unsigned long blinkInterval = 300;
+
+// Note: Pinout for nano eps32 requires pin number changes
 
 void setup()
 {
@@ -38,15 +40,16 @@ void setup()
   delay(100);
 
   // SD Card Test
-  while (!Serial) {} // Waits for serial connection to open 
-  if (!SD.begin(chipSelect)) { // if 
-    Serial.println("Initialization failed!");
-    return;
-  }
+  // while (!Serial) {} // Waits for serial connection to open 
+  // if (!SD.begin(chipSelect)) { // if 
+  //   Serial.println("Initialization failed!");
+  //   return;
+  // }
   // SD Card end
 
-  Wire.begin();
-  lcd.begin(20, 4);
+  Wire.begin();       
+  //lcd.begin(20, 4);
+  lcd.init();
   lcd.backlight();
   lcd.setCursor(0, 0);
   lcd.print("pH Meter Ready");
@@ -132,17 +135,21 @@ void lcdMenu()
       lcd.setCursor(0, 0);
       lcd.print("Calibrate Probe:");
 
-      printMenuItem(0, 1, "pH 1", 0, selectedItem);
-      printMenuItem(0, 2, "pH 2", 1, selectedItem);
-      printMenuItem(0, 3, "pH 3", 2, selectedItem);
-      printMenuItem(6, 1, "ORP 1", 3, selectedItem);
-      printMenuItem(6, 2, "ORP 2", 4, selectedItem);
-      printMenuItem(6, 3, "ORP 3", 5, selectedItem);
-      printMenuItem(13, 2, "Done", 6, selectedItem);
-
+      printMenu(selectedItem);
       isPressed(calibrateMenu, selectedItem);
     }
   }
+}
+
+void printMenu(int selectedItem)
+{
+    printMenuItem(0, 1, "pH 1", 0, selectedItem);
+    printMenuItem(0, 2, "pH 2", 1, selectedItem);
+    printMenuItem(0, 3, "pH 3", 2, selectedItem);
+    printMenuItem(6, 1, "ORP 1", 3, selectedItem);
+    printMenuItem(6, 2, "ORP 2", 4, selectedItem);
+    printMenuItem(6, 3, "ORP 3", 5, selectedItem);
+    printMenuItem(13, 2, "Done", 6, selectedItem);
 }
 
 void isPressed(bool &calibrateMenu, int selectedItem)
@@ -271,13 +278,9 @@ void calibrateProbe() {
 
 void printData(float ph_val, float orp_val)
 {
-  //   float ph_value = atof(ph_str);  // Convert char* to float
-    // Serial.print("pH Val: ");
-    // Serial.println(ph_act);
-  
     lcd.setCursor(0, 0);
     lcd.print("pH: ");
-    lcd.print(ph_val, 3); // to the thousandths
+    lcd.print(ph_val, 3); // To the thousandths
     lcd.print("     "); // Clear leftover digits
 
     lcd.setCursor(0, 1);
