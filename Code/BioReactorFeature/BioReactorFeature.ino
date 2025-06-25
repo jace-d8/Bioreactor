@@ -4,7 +4,7 @@
 #include <SPI.h>
 #include <SD.h>
 
-// const int chipSelect = 10;
+const int chipSelect = 10;
 
 Ezo_board orp_sensor(98, "ORP");  
 Ezo_board ph_sensor(99, "PH");  
@@ -24,8 +24,6 @@ bool blinkState = true;
 unsigned long lastBlinkTime = 0;
 const unsigned long blinkInterval = 300;
 
-float ph_val = 0;
-float orp_val = 0; 
 
 // Note: Pinout for nano eps32 requires pin number changes
 
@@ -45,22 +43,14 @@ void setup()
   pinMode(SW_pin, INPUT_PULLUP);  
   delay(100);
 
-  // SD Card Test
-  // while (!Serial) {} // Waits for serial connection to open 
-  // if (!SD.begin(chipSelect)) { // if 
-  //   Serial.println("Initialization failed!");
-  //   return;
-  // }
-  // SD Card end
+
 
   Wire.begin();       
   //lcd.begin(20, 4);
   lcd.init();
   lcd.backlight();
   lcd.setCursor(0, 0);
-  lcd.print("pH Meter Ready");
-  delay(2000);
-  lcd.clear();
+  lcd.print("Reading Probes");
 }
 
 void loop() 
@@ -68,14 +58,15 @@ void loop()
 
   // is_liquid_detected = digitalRead(LIQUID_SENSOR_PIN); // will become true if sensor detects liquid 
   // is_gas_sensor = digitalRead(GAS_SENSOR_PIN); // is_open will be true if high voltage is read
-  lcdMenu();
   if (millis() - lastReadTime >= readInterval) 
   {
+    float ph_val = readPH();  // Convert char* to float
+    float orp_val = readORP();
+    lcd.clear(); // consider optimizing
     printData(ph_val, orp_val);
-    ph_val = readPH();  // Convert char* to float
-    orp_val = readORP();
     lastReadTime = millis();
   }
+  lcdMenu();
 }
 float readPH()
 {
