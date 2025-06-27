@@ -19,7 +19,7 @@ const unsigned long readInterval = 2000;  // 2 seconds
 const int SW_pin = D2; // D2: input for detecting whether the jotstick/button is pressed
 const int Y_pin = A1; // A1: analog pin connected to Y output 
 
-
+bool isCleared = false;
 bool blinkState = true;
 unsigned long lastBlinkTime = 0;
 const unsigned long blinkInterval = 300;
@@ -51,23 +51,36 @@ void setup()
   lcd.backlight();
   lcd.setCursor(0, 0);
   lcd.print("Reading Probes");
+  lcd.setCursor(0, 1);
+  
+  if (SD.begin(chipSelect)) 
+  {
+    lcd.print("SD initilzed");
+  }else
+  {
+    lcd.print("SD failed");
+  }
 }
 
 void loop() 
 {
-
   // is_liquid_detected = digitalRead(LIQUID_SENSOR_PIN); // will become true if sensor detects liquid 
   // is_gas_sensor = digitalRead(GAS_SENSOR_PIN); // is_open will be true if high voltage is read
   if (millis() - lastReadTime >= readInterval) 
   {
     float ph_val = readPH();  // Convert char* to float
     float orp_val = readORP();
-    lcd.clear(); // consider optimizing
+    if(isCleared)
+    {
+      lcd.clear(); // consider optimizing
+      isCleared = true;
+    }
     printData(ph_val, orp_val);
     lastReadTime = millis();
   }
   lcdMenu();
 }
+
 float readPH()
 {
   ph_sensor.send_cmd("R");         // Send read command
@@ -149,7 +162,7 @@ void printMenu(int selectedItem)
     printMenuItem(13, 2, "Done", 6, selectedItem);
 }
 
-void isPressed(bool &calibrateMenu, int selectedItem)
+void isPressed(bool &calibrateMenu, int selectedItem) // later to be optimized when multiple probes are utilized
 {
   if (!digitalRead(SW_pin)) 
   {
@@ -157,8 +170,11 @@ void isPressed(bool &calibrateMenu, int selectedItem)
     while (!digitalRead(SW_pin));  // wait until released
     if (selectedItem == 0)
     {
-      calibrateProbe();
-    } else if (selectedItem == 6) 
+      calibrateProbePH();
+    }else if(selectedItem == 3)
+    {
+      calibrateProbeORP();
+    }else if (selectedItem == 6) 
     {
       calibrateMenu = false;
       lcd.clear();
@@ -204,7 +220,7 @@ void printMenuItem(int col, int row, const char* label, int itemIndex, int selec
   }
 }
 
-void calibrateProbe() {
+void calibrateProbePH() {
   int bufferSelection = 0;
   bool bufferCalibrated[3] = {false, false, false};
   bool selecting = true;
@@ -271,11 +287,20 @@ void calibrateProbe() {
     {
       lcd.clear();
       lcd.print("All Calibrated!");
-      delay(1500);
+      delay(800);
       lcd.clear();
       selecting = false;
     }
   }
+}
+
+void calibrateProbeORP()
+{
+  lcd.clear();
+  orp_sensor.send_cmd("Cal,222");
+  lcd.print("Calibrated at 222mV");
+  delay(1000);
+  lcd.clear();
 }
 
 void printData(float ph_val, float orp_val)
