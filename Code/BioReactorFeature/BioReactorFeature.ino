@@ -354,14 +354,14 @@ void calibrateProbeORP()
 void setTimeFromBuild()
 {
   struct tm tm; // std C++ time struct
-  if (strptime(__DATE__ " " __TIME__, "%b %d %Y %H:%M:%S", &tm))
+  if (strptime(__DATE__ " " __TIME__, "%b %d %Y %H:%M:%S", &tm)) // Taking compile time and parsing it for tm 
    {
-    time_t t = mktime(&tm);
-    struct timeval now = { .tv_sec = t };
-    settimeofday(&now, nullptr);
+    time_t t = mktime(&tm); // unix timestamp 
+    struct timeval now = { .tv_sec = t }; // std C++ time struct, seconds since 1970, so esp32 can count further
+    settimeofday(&now, nullptr); // setting esp32 clock to laptop time
 
     char buf[32];
-    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&t));
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&t)); // takes seconds and converts to human readable time
     lcd.print(buf);
   } else 
   {
@@ -372,12 +372,12 @@ void setTimeFromBuild()
 void logToSD()
 {
   time_t now = time(nullptr);
-  struct tm* timeinfo = localtime(&now);
+  struct tm* timeinfo = localtime(&now); // reads our updated esp32 time
 
   File dataFile = SD.open("/datalog.csv", FILE_WRITE);
 
   if (dataFile) {
-    dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%d\n",
+    dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%d\n", // logging time from esp32
                     timeinfo->tm_year + 1900,
                     timeinfo->tm_mon + 1,
                     timeinfo->tm_mday,
