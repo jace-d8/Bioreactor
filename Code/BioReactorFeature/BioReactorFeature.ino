@@ -3,6 +3,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <SPI.h>
 #include <SD.h>
+#define UTC_OFFSET (-7 * 3600)  // For Pacific Time (PST). Use 0 for UTC, adjust as needed
 
 const int chipSelect = 10;
 
@@ -18,19 +19,33 @@ const unsigned long readInterval = 2000;  // 2 seconds
 // analog stick
 const int SW_pin = D2; // D2: input for detecting whether the jotstick/button is pressed
 const int Y_pin = A1; // A1: analog pin connected to Y output 
+const int valvePinPH = 3; // Valve that controls pH adjustment solution at d3 
+const int valvePinE = 4; // Electrolyte valve at d4
 
 bool isCleared = false;
 bool blinkState = true;
 unsigned long lastBlinkTime = 0;
 const unsigned long blinkInterval = 300;
 
+float ph_val = 0.0; // I want these globally avaliable
+int orp_val = 0; 
+
 
 // Note: Pinout for nano eps32 requires pin number changes
+// Note: Consider using classes for further modularization
 
 void setup()
 {
   Serial.begin(9600);
   Wire.setClock(1000000);  // Set I2C speed to 100kHz
+
+
+
+  // Valves
+  pinMode(valvePinPH, OUTPUT);
+  pinMode(valvePinE, OUTPUT);
+  digitalWrite(valvePinPH, LOW);  // start with valve off
+  digitalWrite(valvePinE, LOW);  // start with valve off
 
   
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
@@ -60,22 +75,32 @@ void setup()
   {
     lcd.print("SD failed");
   }
+  lcd.setCursor(0, 2);
+  configTime(UTC_OFFSET, 0, "");  
+  setTimeFromBuild();
 }
 
 void loop() 
 {
+  // digitalWrite(valvePinPH, HIGH);  // turn valve ON
+  // digitalWrite(valvePinE, LOW);  // turn valve ON
+  // delay(30000);                  // wait 30 seconds
+  // digitalWrite(valvePinPH, LOW);   // turn valve OFF
+  // digitalWrite(valvePinE, HIGH);  // turn valve ON
+  // delay(30000);                  // wait 30 seconds
   // is_liquid_detected = digitalRead(LIQUID_SENSOR_PIN); // will become true if sensor detects liquid 
   // is_gas_sensor = digitalRead(GAS_SENSOR_PIN); // is_open will be true if high voltage is read
   if (millis() - lastReadTime >= readInterval) 
   {
-    float ph_val = readPH();  // Convert char* to float
-    float orp_val = readORP();
+    ph_val = readPH();  // Convert char* to float
+    orp_val = readORP();
     if(isCleared)
     {
       lcd.clear(); // consider optimizing
       isCleared = true;
     }
-    printData(ph_val, orp_val);
+    printData();
+    // logToSD();
     lastReadTime = millis();
   }
   lcdMenu();
@@ -239,9 +264,9 @@ void calibrateProbePH() {
     printMenuItem(0, 3, "pH 10", 2, bufferSelection);
     printMenuItem(10, 1, "Clear", 3, bufferSelection);  
     printMenuItem(10, 2, "Done", 4, bufferSelection);
-    // lcd.setCursor(10, 3);
-    // lcd.print("pH: ");
-    // lcd.print(ph_val, 3); // to the thousandths
+    lcd.setCursor(10, 3);
+    lcd.print("pH: ");
+    lcd.print(ph_val, 3); // to the thousandths
 
 
     if (bufferCalibrated[0]) lcd.setCursor(6, 1), lcd.print("*");
@@ -296,14 +321,76 @@ void calibrateProbePH() {
 
 void calibrateProbeORP()
 {
+  int selectedItem = 0;  // Only one item for now, but this keeps it consistent
+  bool selecting = true;
   lcd.clear();
-  orp_sensor.send_cmd("Cal,222");
-  lcd.print("Calibrated at 222mV");
-  delay(1000);
-  lcd.clear();
+
+  while (selecting) {
+    updateGlobalBlink();
+
+    lcd.setCursor(0, 0);
+    lcd.print("Calibrate when ready");
+
+    printMenuItem(0, 1, "Cal", 0, selectedItem);
+
+    lcd.setCursor(0, 2);
+    lcd.print("ORP: ");
+    lcd.print(orp_val, 0);
+    lcd.print(" mV     ");
+
+    if (!digitalRead(SW_pin)) {
+      delay(200);  // Debounce
+      while (!digitalRead(SW_pin));  // Wait until released
+      orp_sensor.send_cmd("Cal,222");
+      lcd.clear();
+      lcd.print("Calibrated at 222mV");
+      delay(1000);
+      selecting = false;
+      lcd.clear();
+    }
+  }
 }
 
-void printData(float ph_val, float orp_val)
+void setTimeFromBuild()
+{
+  struct tm tm; // std C++ time struct
+  if (strptime(__DATE__ " " __TIME__, "%b %d %Y %H:%M:%S", &tm))
+   {
+    time_t t = mktime(&tm);
+    struct timeval now = { .tv_sec = t };
+    settimeofday(&now, nullptr);
+
+    char buf[32];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&t));
+    lcd.print(buf);
+  } else 
+  {
+    lcd.print("Failed to parse build time");
+  }
+}
+
+void logToSD()
+{
+  time_t now = time(nullptr);
+  struct tm* timeinfo = localtime(&now);
+
+  File dataFile = SD.open("/datalog.csv", FILE_WRITE);
+
+  if (dataFile) {
+    dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%d\n",
+                    timeinfo->tm_year + 1900,
+                    timeinfo->tm_mon + 1,
+                    timeinfo->tm_mday,
+                    timeinfo->tm_hour,
+                    timeinfo->tm_min,
+                    timeinfo->tm_sec,
+                    ph_val,
+                    orp_val);
+    dataFile.close();
+  }
+}
+
+void printData()
 {
     lcd.setCursor(0, 0);
     lcd.print("pH: ");
