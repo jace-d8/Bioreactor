@@ -4,6 +4,7 @@
 #include <SPI.h>
 #include <SD.h>
 #define UTC_OFFSET (-7 * 3600)  // For Pacific Time (PST). Use 0 for UTC, adjust as needed
+#define PH_MIN 6.3
 
 const int chipSelect = 10;
 
@@ -15,12 +16,45 @@ String inputString = "";  // For manual commands
 
 unsigned long lastReadTime = 0;
 const unsigned long readInterval = 2000;  // 2 seconds
+unsigned long lastHourTime = 0;
+const unsigned long hourInterval = 3600000UL;  // 1 hour = 3,600,000 ms
 
-// analog stick
+// Analog stick
 const int SW_pin = D2; // D2: input for detecting whether the jotstick/button is pressed
 const int Y_pin = A1; // A1: analog pin connected to Y output 
-const int valvePinPH = 3; // Valve that controls pH adjustment solution at d3 
-const int valvePinE = 4; // Electrolyte valve at d4
+
+class Valve{
+private: 
+  int pin; 
+  bool isOpen; 
+  unsigned int startTime;
+  const unsigned long openDuration; 
+public: 
+  Valve(int p, unsigned long d) : pin(p), openDuration(d), isOpen(false), startTime(0) {}
+
+  void open()
+  {
+    if(!isOpen)
+    {
+      digitalWrite(pin, HIGH);
+      startTime = millis(); 
+      isOpen = true;
+    } 
+  }
+  void update()
+  {
+    if (isOpen && (millis() - startTime >= openDuration))
+    {
+      digitalWrite(pin, LOW);
+      isOpen = false;
+    }
+  }
+  bool isValveOpen()
+  {
+    return isOpen;
+  }
+};
+
 
 bool isCleared = false;
 bool blinkState = true;
@@ -39,13 +73,9 @@ void setup()
   Serial.begin(9600);
   Wire.setClock(1000000);  // Set I2C speed to 100kHz
 
-
-
   // Valves
-  pinMode(valvePinPH, OUTPUT);
-  pinMode(valvePinE, OUTPUT);
-  digitalWrite(valvePinPH, LOW);  // start with valve off
-  digitalWrite(valvePinE, LOW);  // start with valve off
+  Valve pHvalve(3, 10000);
+  Valve eLvalve(4, 4000);
 
   
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
@@ -100,9 +130,19 @@ void loop()
       isCleared = true;
     }
     printData();
-    // logToSD();
+   
     lastReadTime = millis();
   }
+   // logToSD(); every 5 min or so
+  if(ph_val < PH_MIN)
+  {
+
+  }
+  if (millis() - lastHourTime >= hourInterval) 
+  {
+    // Electro valve
+  }
+  
   lcdMenu();
 }
 
