@@ -91,9 +91,7 @@ int orp_val = 0;
 Valve pHvalve(3, 10000);
 Valve eLvalve(4, 4000);
 
-
-// Note: Pinout for nano eps32 requires pin number changes
-// Note: Consider using classes for further modularization
+// Note: I will consider using classes for further modularization
 
 void setup()
 {
