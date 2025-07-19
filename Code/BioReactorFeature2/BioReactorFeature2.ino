@@ -1,45 +1,3 @@
-#include <Wire.h>
-#include <Ezo_i2c.h>
-#include <LiquidCrystal_I2C.h>
-#include <SPI.h>
-#include <SD.h>
-#include "Valve.h"
-#define UTC_OFFSET (-7 * 3600)  // For Pacific Time (PST). Use 0 for UTC, adjust as needed
-#define PH_MIN 6.3
-#define ORP_MIN -163
-
-
-const int chipSelect = 10;
-bool disableValves = false; 
-
-File dataFile;
-
-
-LiquidCrystal_I2C lcd(0x27, 20, 4);
-char response[32];              // Buffer for response
-String inputString = "";  // For manual commands
-
-// Intervals
-unsigned long lastReadTime = 0;
-const unsigned long readInterval = 2000;  // 2 seconds
-unsigned long lastHourTime = 0;
-const unsigned long hourInterval = 3600000UL;  // 1 hour = 3,600,000 ms
-unsigned long SDread = 0;
-unsigned long pHread = 0;
-unsigned long eLread = 0;
-const unsigned long cooldownPeriod = 60000UL;
-
-// Analog stick
-const int SW_pin = D2; // D2: input for detecting whether the jotstick/button is pressed
-const int Y_pin = A1; // A1: analog pin connected to Y output 
-
-
-
-
-bool isCleared = false;
-bool blinkState = true;
-unsigned long lastBlinkTime = 0;
-const unsigned long blinkInterval = 300;
 
 // Probes
 Ezo_board orp_sensor(98, "ORP");  
@@ -50,10 +8,13 @@ float ph_val = 0.0; // I want these globally avaliable
 int orp_val = 0; 
 
 // Valves
-Valve pHvalve(3, 10000);
-Valve eLvalve(4, 4000);
+Valve pHvalve(PH_VALVE_PIN, 10000);
+Valve eLvalve(ORP_VALVE_PIN, 4000);
 
 // Note: I will consider using classes for further modularization
+
+void logToSD(String message = "");
+
 
 void setup()
 {
@@ -61,8 +22,8 @@ void setup()
   Wire.setClock(1000000);  // Set I2C speed to 100kHz
 
 
-  pinMode(3, OUTPUT);  // For pHvalve
-  pinMode(4, OUTPUT);  // For eLvalve
+  pinMode(PH_VALVE_PIN, OUTPUT);  // For pHvalve
+  pinMode(ORP_VALVE_PIN, OUTPUT);  // For eLvalve
   
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
   // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tube
@@ -101,6 +62,7 @@ void loop()
 {
   // is_liquid_detected = digitalRead(LIQUID_SENSOR_PIN); // will become true if sensor detects liquid 
   // is_gas_sensor = digitalRead(GAS_SENSOR_PIN); // is_open will be true if high voltage is read
+
   if (isCooldownOver(readInterval, lastReadTime)) 
   {
     ph_val = readPH();  // Convert char* to float
@@ -119,10 +81,25 @@ void loop()
     logToSD(); 
     SDread = millis(); 
   }
-  if((ph_val < PH_MIN) && isCooldownOver(pHread, cooldownPeriod)) 
+  if ((ph_val < PH_MIN) && isCooldownOver(pHread, cooldownPeriod)) 
   {
     pHvalve.open();
     pHread = millis(); 
+
+    // Check time since last activation
+    if (millis() - lastPHactivation > phResetWindow) 
+    {
+      phValveActivationCount = 1;  // reset count
+    }else 
+    {
+      phValveActivationCount++;  // count up
+    }
+    lastPHactivation = millis();
+    if (phValveActivationCount >= phValveMaxActivations) 
+    {
+      displayWarning();  // trigger user intervention
+      phValveActivationCount = 0;  // reset after warning
+    }
   }
   if((orp_val < ORP_MIN) && isCooldownOver(eLread, cooldownPeriod)) // COOLDOWN DOES NOT CURRENTLY ACCOUNT FOR 10 SECONDS OF ACTIVATION
   {
@@ -230,7 +207,6 @@ void printMenu(int selectedItem)
     {
       printMenuItem(13, 1, "Vl OFF", 6, selectedItem);
     }
-
     printMenuItem(13, 2, "Done", 7, selectedItem);
 }
 
@@ -272,7 +248,6 @@ void isPressed(bool &calibrateMenu, int selectedItem) // later to be optimized w
 void analogControl(int& selectedItem)
 {
   int yVal = analogRead(Y_pin);
-
   // Dead zone around the resting value (~1980)
   const int deadZone = 400;
 
@@ -290,15 +265,18 @@ void analogControl(int& selectedItem)
 }
 
 
-void updateGlobalBlink() {
+void updateGlobalBlink() 
+{
   unsigned long currentMillis = millis();
-  if (currentMillis - lastBlinkTime >= blinkInterval) {
+  if (currentMillis - lastBlinkTime >= blinkInterval)
+  {
     blinkState = !blinkState;
     lastBlinkTime = currentMillis;
   }
 }
 
-void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex) {
+void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex) 
+{
   lcd.setCursor(col, row);
   if (itemIndex == selectedIndex && blinkState) {
     lcd.print("      ");  // Blank line to simulate blinking
@@ -307,14 +285,16 @@ void printMenuItem(int col, int row, const char* label, int itemIndex, int selec
   }
 }
 
-void calibrateProbePH() {
+void calibrateProbePH() 
+{
   int bufferSelection = 0;
   bool bufferCalibrated[3] = {false, false, false};
   bool selecting = true;
 
   lcd.clear();
 
-  while (selecting) {
+  while (selecting) 
+  {
     analogControl(bufferSelection);
     updateGlobalBlink();
 
@@ -410,7 +390,8 @@ void calibrateProbeORP()
     
 
 
-    if (!digitalRead(SW_pin)) {
+    if (!digitalRead(SW_pin))
+    {
       delay(200);  // Debounce
       while (!digitalRead(SW_pin));  // Wait until released
       switch(selectedItem)
@@ -451,12 +432,18 @@ void setTimeFromBuild()
   }
 }
 
-void logToSD()
+void logToSD(String message)
 {
   time_t now = time(nullptr);
   struct tm* timeinfo = localtime(&now); // reads our updated esp32 time
 
-  if (dataFile) {
+  if (!dataFile) 
+  {
+    lcd.print("File failed\n");
+    return;
+  }
+  if (message.length() == 0) 
+  {
     dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%d\n", // logging time from esp32
                     timeinfo->tm_year + 1900,
                     timeinfo->tm_mon + 1,
@@ -467,9 +454,46 @@ void logToSD()
                     ph_val,
                     orp_val);
     dataFile.flush();
-  }else
+  }
+  else
   {
-    dataFile.printf("File failed\n");
+    dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%s\n",
+                    timeinfo->tm_year + 1900,
+                    timeinfo->tm_mon + 1,
+                    timeinfo->tm_mday,
+                    timeinfo->tm_hour,
+                    timeinfo->tm_min,
+                    timeinfo->tm_sec,
+                    message.c_str());   
+  }         
+}
+
+void displayWarning()
+{
+  bool bypass_warning = false; 
+  lcd.clear();
+  while(!bypass_warning)
+  {
+    updateGlobalBlink();
+
+    lcd.setCursor(0, 0);
+    lcd.print("WARNING:");
+    
+    lcd.setCursor(0, 1);
+    lcd.print("pH buffer not reacting");
+
+    printMenuItem(0, 2, "Unlock System?", 0, 0);
+
+    if (!digitalRead(SW_pin)) 
+    {
+      delay(200);
+      while (!digitalRead(SW_pin)); 
+      bypass_warning = true;
+      lcd.clear();
+      lcd.print("System Unlocked");
+      delay(700);
+      lcd.clear();
+    }
   }
 }
 

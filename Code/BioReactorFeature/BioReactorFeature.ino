@@ -28,6 +28,11 @@ unsigned long pHread = 0;
 unsigned long eLread = 0;
 const unsigned long cooldownPeriod = 60000UL;
 
+int phValveActivationCount = 0;
+const int phValveMaxActivations = 5;
+unsigned long lastPHactivation = 0;
+const unsigned long phResetWindow = 15 * 60 * 1000UL; // 15 minutes to reset count
+
 // Analog stick
 const int SW_pin = D2; // D2: input for detecting whether the jotstick/button is pressed
 const int Y_pin = A1; // A1: analog pin connected to Y output 
@@ -73,6 +78,8 @@ public:
   }
 };
 
+void logToSD(String message = "");
+
 
 bool isCleared = false;
 bool blinkState = true;
@@ -112,8 +119,6 @@ void setup()
   pinMode(SW_pin, INPUT_PULLUP);  
   //delay(100);
 
-
-
   Wire.begin();       
   lcd.init();
   lcd.backlight();
@@ -152,19 +157,36 @@ void loop()
     lastReadTime = millis();
   }
 
-  if(isCooldownOver(SDread, 120000)) // 2 min, will change later
+  if(isCooldownOver(SDread, 6000)) // 2 min, will change later
   {
     logToSD(); 
     SDread = millis(); 
   }
-  if((ph_val < PH_MIN) && isCooldownOver(pHread, cooldownPeriod)) 
+  if ((ph_val < PH_MIN) && isCooldownOver(pHread, cooldownPeriod)) 
   {
     pHvalve.open();
+    logToSD("pH valve toggled"); 
     pHread = millis(); 
+
+    // Check time since last activation
+    if (millis() - lastPHactivation > phResetWindow) 
+    {
+      phValveActivationCount = 1;  // reset count
+    }else 
+    {
+      phValveActivationCount++;  // count up
+    }
+    lastPHactivation = millis();
+    if (phValveActivationCount >= phValveMaxActivations) 
+    {
+      displayWarning();  // trigger user intervention
+      phValveActivationCount = 0;  // reset after warning
+    }
   }
-  if((orp_val < ORP_MIN) && isCooldownOver(eLread, cooldownPeriod)) // COOLDOWN DOES NOT CURRENTLY ACCOUNT FOR 10 SECONDS OF ACTIVATION
+  if((orp_val < ORP_MIN) && isCooldownOver(eLread, cooldownPeriod)) // COOLDOWN DOES NOT CURRENTLY ACCOUNT FOR 10 SECONDS OF ACTIVATION, 50 second cooldown
   {
     eLvalve.open();
+    logToSD("ORP valve toggled"); 
     eLread = millis(); 
   }
   if (isCooldownOver(lastHourTime, hourInterval))  
@@ -428,6 +450,7 @@ void calibrateProbeORP()
   lcd.clear();
 
   while (selecting) {
+    analogControl(selectedItem);
     updateGlobalBlink();
 
     // if(isCooldownOver(lastPrint, 4000)) // 4 second cooldown
@@ -460,6 +483,7 @@ void calibrateProbeORP()
           delay(1000);
           selecting = false;
           lcd.clear();
+          break;
         case 1: 
           lcd.clear();
           lcd.print("Returning");
@@ -489,12 +513,18 @@ void setTimeFromBuild()
   }
 }
 
-void logToSD()
+void logToSD(String message)
 {
   time_t now = time(nullptr);
   struct tm* timeinfo = localtime(&now); // reads our updated esp32 time
 
-  if (dataFile) {
+  if (!dataFile) 
+  {
+    lcd.print("File failed\n");
+    return;
+  }
+  if (message.length() == 0) 
+  {
     dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%d\n", // logging time from esp32
                     timeinfo->tm_year + 1900,
                     timeinfo->tm_mon + 1,
@@ -505,9 +535,48 @@ void logToSD()
                     ph_val,
                     orp_val);
     dataFile.flush();
-  }else
+  }
+  else
   {
-    dataFile.printf("File failed\n");
+    dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%s\n",
+                    timeinfo->tm_year + 1900,
+                    timeinfo->tm_mon + 1,
+                    timeinfo->tm_mday,
+                    timeinfo->tm_hour,
+                    timeinfo->tm_min,
+                    timeinfo->tm_sec,
+                    message.c_str());   
+  }         
+}
+
+void displayWarning()
+{
+  bool bypass_warning = false; 
+  lcd.clear();
+  pHvalve.switchValve();
+  while(!bypass_warning)
+  {
+    updateGlobalBlink();
+
+    lcd.setCursor(0, 0);
+    lcd.print("WARNING:");
+    
+    lcd.setCursor(0, 1);
+    lcd.print("pH valve overuse");
+
+    printMenuItem(0, 2, "Unlock?", 0, 0);
+
+    if (!digitalRead(SW_pin)) 
+    {
+      delay(200);
+      while (!digitalRead(SW_pin)); 
+      bypass_warning = true;
+      lcd.clear();
+      lcd.print("System Unlocked");
+      delay(700);
+      lcd.clear();
+      pHvalve.switchValve();
+    }
   }
 }
 
