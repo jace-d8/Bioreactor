@@ -15,6 +15,40 @@ Valve eLvalve(ORP_VALVE_PIN, 4000);
 
 void logToSD(String message = "");
 
+// LCD layout constants
+enum LCD_POS {
+    ROW_TITLE = 0,
+    ROW_1 = 1,
+    ROW_2 = 2,
+    ROW_3 = 3,
+    COL_LEFT = 0,
+    COL_MID = 6, 
+    COL_RIGHT = 10
+};
+
+struct MenuItem {
+    int col;
+    int row;
+    const char* label;
+    int index;
+};
+
+MenuItem menuChoices[] = {
+    { COL_LEFT, ROW_1, "pH 1",  0 },
+    { COL_LEFT, ROW_2, "pH 2",  1 },
+    { COL_LEFT, ROW_3, "pH 3",  2 },
+    { COL_MID, ROW_1, "ORP 1", 3 },
+    { COL_MID, ROW_2, "ORP 2", 4 },
+    { COL_MID, ROW_3, "ORP 3", 5 }
+}
+
+MenuItem calMenuChoices[] = {
+    { COL_LEFT,  ROW_1, "pH 4",  0 },
+    { COL_LEFT,  ROW_2, "pH 7",  1 },
+    { COL_LEFT,  ROW_3, "pH 10", 2 },
+    { COL_RIGHT, ROW_1, "Clear", 3 },
+    { COL_RIGHT, ROW_2, "Done",  4 }
+};
 
 void setup()
 {
@@ -38,6 +72,7 @@ void setup()
 
 
   Wire.begin();       
+
   lcd.init();
   lcd.backlight();
   lcd.setCursor(0, 0);
@@ -151,47 +186,7 @@ bool isCooldownOver(unsigned long lastTime, unsigned long cooldown)
 //   }
 // }
 
-void lcdMenu()
-{
-  bool calibrateMenu = false;
-  int selectedItem = -1;  // 0 = pH Probe 1, 1 = pH Probe 2...
-  if(!digitalRead(SW_pin))
-  {
-    delay(200);  // debounce
-    calibrateMenu = true; 
-    selectedItem = 0;
-    lcd.clear();
-    while(calibrateMenu)
-    {
-      analogControl(selectedItem);
-      updateGlobalBlink();
 
-      lcd.setCursor(0, 0);
-      lcd.print("Calibrate Probe:");
-
-      printMenu(selectedItem);
-      isPressed(calibrateMenu, selectedItem);
-    }
-  }
-}
-
-void printMenu(int selectedItem)
-{
-    printMenuItem(0, 1, "pH 1", 0, selectedItem);
-    printMenuItem(0, 2, "pH 2", 1, selectedItem);
-    printMenuItem(0, 3, "pH 3", 2, selectedItem);
-    printMenuItem(6, 1, "ORP 1", 3, selectedItem);
-    printMenuItem(6, 2, "ORP 2", 4, selectedItem);
-    printMenuItem(6, 3, "ORP 3", 5, selectedItem);
-    if(disableValves)
-    {
-      printMenuItem(13, 1, "Vl ON", 6, selectedItem);
-    }else
-    {
-      printMenuItem(13, 1, "Vl OFF", 6, selectedItem);
-    }
-    printMenuItem(13, 2, "Done", 7, selectedItem);
-}
 
 void isPressed(bool &calibrateMenu, int selectedItem) // later to be optimized when multiple probes are utilized
 {
@@ -248,25 +243,6 @@ void analogControl(int& selectedItem)
 }
 
 
-void updateGlobalBlink() 
-{
-  unsigned long currentMillis = millis();
-  if (currentMillis - lastBlinkTime >= blinkInterval)
-  {
-    blinkState = !blinkState;
-    lastBlinkTime = currentMillis;
-  }
-}
-
-void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex) 
-{
-  lcd.setCursor(col, row);
-  if (itemIndex == selectedIndex && blinkState) {
-    lcd.print("      ");  // Blank line to simulate blinking
-  } else {
-    lcd.print(label);
-  }
-}
 
 void calibrateProbePH() 
 {
@@ -283,14 +259,21 @@ void calibrateProbePH()
 
     // ph_val = readPH();   putting this on hold
 
-    lcd.setCursor(0, 0);
+    lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Select Buffer:");
-    printMenuItem(0, 1, "pH 4", 0, bufferSelection);
-    printMenuItem(0, 2, "pH 7", 1, bufferSelection);
-    printMenuItem(0, 3, "pH 10", 2, bufferSelection);
-    printMenuItem(10, 1, "Clear", 3, bufferSelection);  
-    printMenuItem(10, 2, "Done", 4, bufferSelection);
-    lcd.setCursor(10, 3);
+
+    for (const auto &item : menuItems) 
+    {
+        printMenuItem(item.col, item.row, item.label, item.index, bufferSelection); // if your buffer selected matches the item index it blinks
+    }
+
+    // printMenuItem(0, 1, "pH 4", 0, bufferSelection);
+    // printMenuItem(0, 2, "pH 7", 1, bufferSelection);
+    // printMenuItem(0, 3, "pH 10", 2, bufferSelection);
+    // printMenuItem(10, 1, "Clear", 3, bufferSelection);  
+    // printMenuItem(10, 2, "Done", 4, bufferSelection);
+    // lcd.setCursor(10, 3);
+
     // lcd.print("pH: ");
     // lcd.print(ph_val, 3); // to the thousandths
 
@@ -300,11 +283,13 @@ void calibrateProbePH()
     if (bufferCalibrated[2]) lcd.setCursor(6, 3), lcd.print("*");
 
     
-    if (!digitalRead(SW_pin)) {
-      delay(200);
+    if (!digitalRead(SW_pin))
+    {
+      // delay(200); the while loop should remove need for delay
       while (!digitalRead(SW_pin)); 
 
-      switch (bufferSelection) {
+      switch (bufferSelection) 
+      {
         case 0:
           ph_sensor.send_cmd("Cal,low,4.00");
           bufferCalibrated[0] = true;
@@ -352,7 +337,8 @@ void calibrateProbeORP()
   int lastPrint = 0;
   lcd.clear();
 
-  while (selecting) {
+  while (selecting) 
+  {
     updateGlobalBlink();
 
     // if(isCooldownOver(lastPrint, 4000)) // 4 second cooldown
@@ -397,60 +383,6 @@ void calibrateProbeORP()
   }
 }
 
-void setTimeFromBuild()
-{
-  struct tm tm; // std C++ time struct
-  if (strptime(__DATE__ " " __TIME__, "%b %d %Y %H:%M:%S", &tm)) // Taking compile time and parsing it for tm 
-   {
-    time_t t = mktime(&tm); // unix timestamp 
-    struct timeval now = { .tv_sec = t }; // std C++ time struct, seconds since 1970, so esp32 can count further
-    settimeofday(&now, nullptr); // setting esp32 clock to laptop time
-
-    char buf[32];
-    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&t)); // takes seconds and converts to human readable time
-    lcd.print(buf);
-  } else 
-  {
-    lcd.print("Failed to parse build time");
-  }
-}
-
-void logToSD(String message)
-{
-  time_t now = time(nullptr);
-  struct tm* timeinfo = localtime(&now); // reads our updated esp32 time
-
-  if (!dataFile) 
-  {
-    lcd.print("File failed\n");
-    return;
-  }
-  if (message.length() == 0) 
-  {
-    dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%d\n", // logging time from esp32
-                    timeinfo->tm_year + 1900,
-                    timeinfo->tm_mon + 1,
-                    timeinfo->tm_mday,
-                    timeinfo->tm_hour,
-                    timeinfo->tm_min,
-                    timeinfo->tm_sec,
-                    ph_val,
-                    orp_val);
-    dataFile.flush();
-  }
-  else
-  {
-    dataFile.printf("%04d-%02d-%02d %02d:%02d:%02d,%s\n",
-                    timeinfo->tm_year + 1900,
-                    timeinfo->tm_mon + 1,
-                    timeinfo->tm_mday,
-                    timeinfo->tm_hour,
-                    timeinfo->tm_min,
-                    timeinfo->tm_sec,
-                    message.c_str());   
-  }         
-}
-
 void displayWarning()
 {
   bool bypass_warning = false; 
@@ -491,9 +423,4 @@ void printData()
     lcd.print("ORP: ");
     lcd.print(orp_val, 0);
     lcd.print(" mV     ");
-
-    // lcd.setCursor(0, 2);
-    // lcd.print("Count: ");
-    // lcd.print(counter);  
-    // lcd.print("     ");
 }
