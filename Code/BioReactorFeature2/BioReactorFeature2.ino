@@ -122,23 +122,6 @@ bool isCooldownOver(unsigned long lastTime, unsigned long cooldown)
  return (millis() - lastTime >= cooldown);
 }
 
-float readPH()
-{
-  ph_sensor.send_cmd("R");         // Send read command
-  delay(900);                      // Wait for the sensor to respond
-  ph_sensor.receive_cmd(response, 32);  // Read response into buffer
-  return atof(response);
-}
-
-float readORP()
-{
-  orp_sensor.send_cmd("R");
-  delay(900);
-  orp_sensor.receive_cmd(response, 32);
-  return atof(response);
-}
-
-
 // void liquidLevelCheck(bool is_liquid_detected)
 // {
 //   if(is_liquid_detected)
