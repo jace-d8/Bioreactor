@@ -39,7 +39,7 @@ public:
 
   void switchValve()
   {
-    enable_ = !enable_;
+    enable_ = !enable_; // consider returning state
   }
 
   bool isEnabled()

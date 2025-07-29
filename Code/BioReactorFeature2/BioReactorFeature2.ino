@@ -27,7 +27,9 @@ void setup()
   pinMode(PinConfigurations::PIN_SW, INPUT_PULLUP);
 
   initLcd();
-  lcd.setCursor(0, 1);
+  // lcd.setCursor(COL_LEFT, ROW_1); forgot what this does 
+
+  // Needs to be moved 
   if (SD.begin(SD_CHIP_SELECT))
   {
     lcd.print("SD initialized");
@@ -37,17 +39,14 @@ void setup()
     lcd.print("SD failed");
   }
 
-  lcd.setCursor(0, 2);
-  configTime(UTC_OFFSET, 0, "");
-  setTimeFromBuild();
+  // lcd.setCursor(COL_LEFT, ROW_2); Idk why this was here
+
+
+  configTime(UTC_OFFSET, 0, ""); // This should be either computer time or last counted time, whichever is "higher"
+  setTimeFromBuild(); // This too 
 }
 
-bool isCooldownOver(unsigned long cooldown, unsigned long lastTime)
-{
-  return (millis() - lastTime >= cooldown);
-}
-
-void loop()
+void loop() // minimize delay() and cut down on non modularized logic
 { 
   // Periodic sensor reads
   if (isCooldownOver(TimingIntervals::SENSOR_READ_INTERVAL, config.lastSensorReadTime))
@@ -113,22 +112,47 @@ void loop()
   toggleMenu(config);
 }
 
-void isPressed(ConfigState& config, bool &calibrateMenu, int selectedItem)
+// Will stay in the .ino
+bool isCooldownOver(unsigned long cooldown, unsigned long lastTime)
+{
+  return (millis() - lastTime >= cooldown);
+}
+
+// Will stay in the .ino
+void analogControl(int &selectedItem)
+{
+  int yVal = analogRead(PinConfigurations::PIN_JOYSTICK_Y);
+  const int deadZone = 400;
+
+  if (yVal < 1980 - deadZone)  // Up
+  {
+    if (selectedItem > MENU_PH1) selectedItem--;
+    delay(200); // Debounce
+  }
+  else if (yVal > 1980 + deadZone)  // Down
+  {
+    if (selectedItem < MENU_DONE) selectedItem++;
+    delay(200); // Debounce
+  }
+}
+
+// This needs reworked
+void isPressed(ConfigState& config, bool &calibrateMenu, int selectedItem)  
 {
   if (!digitalRead(PinConfigurations::PIN_SW))
   {
     delay(200);  // debounce
     while (!digitalRead(PinConfigurations::PIN_SW));  // wait until released
 
-    if (selectedItem == 0)
+    if (selectedItem == MENU_PH1)
     {
       calibrateProbePH(config);
     }
-    else if (selectedItem == 3)
+    else if (selectedItem == MENU_ORP1)
     {
       calibrateProbeORP(config);
     }
-    else if (selectedItem == 6)
+    else if (selectedItem == MENU_VALVE_TOGGLE)
     {
       config.valvesDisabled = !config.valvesDisabled;
       phValve.switchValve();
@@ -138,7 +162,7 @@ void isPressed(ConfigState& config, bool &calibrateMenu, int selectedItem)
       delay(600);
       lcd.clear();
     }
-    else if (selectedItem == 7)
+    else if (selectedItem == MENU_DONE)
     {
       calibrateMenu = false;
       lcd.clear();
@@ -146,23 +170,9 @@ void isPressed(ConfigState& config, bool &calibrateMenu, int selectedItem)
   }
 }
 
-void analogControl(int &selectedItem)
-{
-  int yVal = analogRead(PinConfigurations::PIN_JOYSTICK_Y);
-  const int deadZone = 400;
 
-  if (yVal < 1980 - deadZone)  // Up
-  {
-    if (selectedItem > 0) selectedItem--;
-    delay(200); // Debounce
-  }
-  else if (yVal > 1980 + deadZone)  // Down
-  {
-    if (selectedItem < 7) selectedItem++;
-    delay(200); // Debounce
-  }
-}
 
+// Break down and move 
 void calibrateProbePH(ConfigState& config)
 {
   int bufferSelection = 0;
@@ -178,9 +188,9 @@ void calibrateProbePH(ConfigState& config)
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Select Buffer:");
 
-    if (bufferCalibrated[0]) lcd.setCursor(6, 1), lcd.print("*");
-    if (bufferCalibrated[1]) lcd.setCursor(6, 2), lcd.print("*");
-    if (bufferCalibrated[2]) lcd.setCursor(6, 3), lcd.print("*");
+    if (bufferCalibrated[0]) lcd.setCursor(COL_MID, ROW_1), lcd.print("*");
+    if (bufferCalibrated[1]) lcd.setCursor(COL_MID, ROW_2), lcd.print("*");
+    if (bufferCalibrated[2]) lcd.setCursor(COL_MID, ROW_3), lcd.print("*");
 
     if (!digitalRead(PinConfigurations::PIN_SW))
     {
@@ -238,10 +248,10 @@ void calibrateProbeORP(ConfigState& config)
   while (selecting)
   {
     updateGlobalBlink(config);
-    lcd.setCursor(0, 0);
+    lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Calibrate when ready");
-    printMenuItem(0, 1, "Cal", 0, selectedItem);
-    printMenuItem(0, 2, "Done", 1, selectedItem);
+    printMenuItem(COL_LEFT, ROW_1, "Cal", 0, selectedItem);
+    printMenuItem(COL_LEFT, ROW_2, "Done", 1, selectedItem);
 
     if (!digitalRead(PinConfigurations::PIN_SW))
     {
@@ -268,40 +278,4 @@ void calibrateProbeORP(ConfigState& config)
   }
 }
 
-void displayWarning(ConfigState& config)
-{
-  bool bypassWarning = false;
-  lcd.clear();
-  while (!bypassWarning)
-  {
-    updateGlobalBlink(config);
-    lcd.setCursor(0, 0);
-    lcd.print("WARNING:");
-    lcd.setCursor(0, 1);
-    lcd.print("pH buffer not reacting");
-    printMenuItem(0, 2, "Unlock System?", 0, 0);
 
-    if (!digitalRead(PinConfigurations::PIN_SW))
-    {
-      delay(200);
-      while (!digitalRead(PinConfigurations::PIN_SW));
-      bypassWarning = true;
-      lcd.clear();
-      lcd.print("System Unlocked");
-      delay(700);
-      lcd.clear();
-    }
-  }
-}
-
-void printData(ConfigState& config)
-{
-  lcd.setCursor(0, 0);
-  lcd.print("pH: ");
-  lcd.print(config.phValue, 3);
-  lcd.print("     ");
-  lcd.setCursor(0, 1);
-  lcd.print("ORP: ");
-  lcd.print(config.orpValue, 0);
-  lcd.print(" mV     ");
-}

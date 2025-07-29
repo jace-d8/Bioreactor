@@ -17,14 +17,14 @@ namespace Thresholds
   const int ORP_MINIMUM = -163;
 }
 
-namespace TimingIntervals
+namespace TimingIntervals // Counted in milliseconds; anything larger than 32,767 MUST be followed by UL
 {
-  const unsigned long SENSOR_READ_INTERVAL = 2000;
+  const unsigned long SENSOR_READ_INTERVAL = 2000UL;
   const unsigned long HOUR_INTERVAL = 3600000UL;
   const unsigned long VALVE_COOLDOWN = 60000UL;
-  const int PH_VALVE_MAX_ACTIVATIONS = 5;
+  const int PH_VALVE_MAX_ACTIVATIONS = 5; 
   const unsigned long PH_RESET_WINDOW = 15 * 60 * 1000UL;
-  const unsigned long BLINK_INTERVAL = 300;
+  const unsigned long BLINK_INTERVAL = 300UL;
 }
 
 // SD

@@ -13,7 +13,20 @@ enum LcdPos
   ROW_3 = 3,
   COL_LEFT = 0,
   COL_MID = 6,
-  COL_RIGHT = 10
+  COL_RIGHT = 10,
+  COL_FAR_RIGHT = 13
+};
+
+enum MenuIndices
+{
+  MENU_PH1 = 0,
+  MENU_PH2,
+  MENU_PH3,
+  MENU_ORP1,
+  MENU_ORP2,
+  MENU_ORP3,
+  MENU_VALVE_TOGGLE,
+  MENU_DONE
 };
 
 struct MenuItem
@@ -33,4 +46,8 @@ void toggleMenu(ConfigState& config);
 void printLcdMenu(ConfigState& config, int selectedItem);
 void updateGlobalBlink(ConfigState& config);
 void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex);
+void printData(ConfigState& config);
+void displayWarning(ConfigState& config);
+
+
 
