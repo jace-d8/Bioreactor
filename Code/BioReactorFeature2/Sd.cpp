@@ -2,7 +2,7 @@
 #include "Lcd.h"
 #include "Config.h"
 
-File dataFile;
+File dataFile; // Consider errory handling
 
 void setTimeFromBuild()
 {

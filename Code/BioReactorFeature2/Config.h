@@ -1,28 +1,37 @@
 #pragma once
 #include <Arduino.h>
 
-// Pin Config
-const int PIN_SW = 5;            // D2
-const int PIN_JOYSTICK_Y = 2;    // A1
-const int PH_VALVE_PIN = 3;
-const int ORP_VALVE_PIN = 4; 
 
-// Thresholds
-const int PH_MINIMUM = 6.3;
-const int ORP_MINIMUM = -163;
+namespace PinConfigurations
+{
+  const int PIN_SW = 5;            // D2
+  const int PIN_JOYSTICK_Y = 2;    // A1
+  const int PH_VALVE_PIN = 3;
+  const int ORP_VALVE_PIN = 4; 
+}
+
+
+namespace Thresholds
+{
+  const int PH_MINIMUM = 6.3;
+  const int ORP_MINIMUM = -163;
+}
+
+namespace TimingIntervals
+{
+  const unsigned long SENSOR_READ_INTERVAL = 2000;
+  const unsigned long HOUR_INTERVAL = 3600000UL;
+  const unsigned long VALVE_COOLDOWN = 60000UL;
+  const int PH_VALVE_MAX_ACTIVATIONS = 5;
+  const unsigned long PH_RESET_WINDOW = 15 * 60 * 1000UL;
+  const unsigned long BLINK_INTERVAL = 300;
+}
 
 // SD
 const int SD_CHIP_SELECT = 10;
 
-// Timing
-const unsigned long SENSOR_READ_INTERVAL = 2000;
-const unsigned long HOUR_INTERVAL = 3600000UL;
-const unsigned long VALVE_COOLDOWN = 60000UL;
-const int PH_VALVE_MAX_ACTIVATIONS = 5;
-const unsigned long PH_RESET_WINDOW = 15 * 60 * 1000UL;
-const unsigned long BLINK_INTERVAL = 300;
 
-// Globals (consider removing these later), encapuslate in struct or something
+// Globals (consider removing these later), encapuslate in struct or something. NAMESPACE
 extern bool valvesDisabled;
 extern String serialInput;
 extern unsigned long lastSensorReadTime;

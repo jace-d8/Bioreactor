@@ -44,8 +44,11 @@ void setup()
   setTimeFromBuild();
 }
 
-void loop()
-{
+// Try and reduce delay blocks
+
+
+void loop() // Loop has mixed responsibilty, encapuslate
+{ 
   // Periodic sensor reads
   if (isCooldownOver(SENSOR_READ_INTERVAL, lastSensorReadTime))
   {
