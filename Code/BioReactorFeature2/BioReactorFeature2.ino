@@ -1,8 +1,4 @@
 #include <Wire.h>
-
-
-
-// File includes 
 #include "Config.h"
 #include "Valve.h"
 #include "EzoBoard.h"
@@ -10,178 +6,140 @@
 #include "Sd.h"
 
 // Probes
-Ezo_board orp_sensor(98, "ORP");  
-Ezo_board ph_sensor(99, "PH");  
+EzoBoard orpSensor(98, "ORP");
+EzoBoard phSensor(99, "PH");
 
 // Valves
-Valve pHvalve(PH_VALVE_PIN, 10000);
-Valve eLvalve(ORP_VALVE_PIN, 4000);
+Valve phValve(PH_VALVE_PIN, 10000);
+Valve orpValve(ORP_VALVE_PIN, 4000);
 
-// Probe Vals
-float ph_val = 0.0; // Consider changing these to some local scope 
-int orp_val = 0; 
-
-
+// Probe Values
+float phValue = 0.0;
+int orpValue = 0;
 
 void setup()
 {
-  Serial.begin(9600); // Init serial comms at 9600 baud
-  Wire.begin();  // Init i2c 
-  Wire.setClock(400000);   // Set I2C speed to 400 kHz (Fast Mode)
+  Serial.begin(9600);              // Init serial comms at 9600 baud
+  Wire.begin();                    // Init I2C
+  Wire.setClock(400000);           // Set I2C speed to 400 kHz (Fast Mode)
 
-  pinMode(PH_VALVE_PIN, OUTPUT);  
-  pinMode(ORP_VALVE_PIN, OUTPUT);  
-  
-  // pinMode(LIQUID_SENSOR_PIN, INPUT);  
-  // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tube
-  // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
+  pinMode(PH_VALVE_PIN, OUTPUT);
+  pinMode(ORP_VALVE_PIN, OUTPUT);
 
-  //pinMode(SW_PIN, INPUT); // Setup SW input
-  //digitalWrite(SW_PIN, HIGH);  // Reading button state: 1 = not pressed, 0 = pressed
-  // The above two lines are for normal arduino, the below is for the nano esp32
-  pinMode(SW_PIN, INPUT_PULLUP);  
-  //delay(100);
-
+  pinMode(PIN_SW, INPUT_PULLUP);
 
   initLcd();
   lcd.setCursor(0, 1);
-  if (SD.begin(SD_CHIP_SELECT)) 
+  if (SD.begin(SD_CHIP_SELECT))
   {
-    lcd.print("SD initilzed");
-    //dataFile = SD.open("/data.csv", FILE_WRITE);
-    // dataFile.println("DATE,PH,ORP");
-  }else
+    lcd.print("SD initialized");
+  }
+  else
   {
     lcd.print("SD failed");
   }
+
   lcd.setCursor(0, 2);
-  configTime(UTC_OFFSET, 0, "");  
+  configTime(UTC_OFFSET, 0, "");
   setTimeFromBuild();
 }
 
-void loop() 
+void loop()
 {
-  // is_liquid_detected = digitalRead(LIQUID_SENSOR_PIN); // will become true if sensor detects liquid 
-  // is_gas_sensor = digitalRead(GAS_SENSOR_PIN); // is_open will be true if high voltage is read
-
-  if (isCooldownOver(readInterval, lastReadTime)) 
+  // Periodic sensor reads
+  if (isCooldownOver(SENSOR_READ_INTERVAL, lastSensorReadTime))
   {
-    ph_val = ph_sensor.read();  // Convert char* to float
-    orp_val = orp_sensor.read();
-    if(!isCleared)
+    phValue = phSensor.read();
+    orpValue = orpSensor.read();
+    if (!lcdCleared)
     {
-      lcd.clear(); // consider optimizing
-      isCleared = true;
+      lcd.clear();
+      lcdCleared = true;
     }
-    printData();   
-    lastReadTime = millis();
+    printData();
+    lastSensorReadTime = millis();
   }
 
-  if(isCooldownOver(sDread, 120000)) // 2 min, will change later
+  // Periodic SD logging
+  if (isCooldownOver(120000, lastSdLogTime)) // 2 min
   {
-    logToSD(); 
-    sDread = millis(); 
+    logToSD();
+    lastSdLogTime = millis();
   }
-  if ((ph_val < PH_MINIMUM) && isCooldownOver(pHread, cooldownPeriod)) 
-  {
-    pHvalve.open();
-    pHread = millis(); 
 
-    // Check time since last activation
-    if (millis() - lastPHactivation > phResetWindow) 
+  // PH Valve Control
+  if ((phValue < PH_MINIMUM) && isCooldownOver(VALVE_COOLDOWN, lastPhValveTime))
+  {
+    phValve.open();
+    lastPhValveTime = millis();
+
+    // Valve activation count logic
+    if (millis() - lastPhActivation > PH_RESET_WINDOW)
     {
-      phValveActivationCount = 1;  // reset count
-    }else 
-    {
-      phValveActivationCount++;  // count up
+      phValveActivationCount = 1;
     }
-    lastPHactivation = millis();
-    if (phValveActivationCount >= phValveMaxActivations) 
+    else
     {
-      displayWarning();  // trigger user intervention
-      phValveActivationCount = 0;  // reset after warning
+      phValveActivationCount++;
+    }
+    lastPhActivation = millis();
+
+    if (phValveActivationCount >= PH_VALVE_MAX_ACTIVATIONS)
+    {
+      displayWarning();
+      phValveActivationCount = 0;
     }
   }
-  if((orp_val < ORP_MINIMUM) && isCooldownOver(eLread, cooldownPeriod)) // COOLDOWN DOES NOT CURRENTLY ACCOUNT FOR 10 SECONDS OF ACTIVATION
+
+  // ORP Valve Control
+  if ((orpValue < ORP_MINIMUM) && isCooldownOver(VALVE_COOLDOWN, lastOrpValveTime))
   {
-    eLvalve.open();
-    eLread = millis(); 
-  }
-  if (isCooldownOver(lastHourTime, hourInterval))  
-  {
-    eLvalve.open();
-    lastHourTime = millis();
+    orpValve.open();
+    lastOrpValveTime = millis();
   }
 
-  pHvalve.update();
-  eLvalve.update(); 
-  toggleMenu(); // put in if statement
+  // Hourly ORP flush
+  if (isCooldownOver(HOUR_INTERVAL, lastHourTrigger))
+  {
+    orpValve.open();
+    lastHourTrigger = millis();
+  }
+
+  phValve.update();
+  orpValve.update();
+  toggleMenu();
+}
+bool isCooldownOver(unsigned long cooldown, unsigned long lastTime)
+{
+  return (millis() - lastTime >= cooldown);
 }
 
-bool isCooldownOver(unsigned long lastTime, unsigned long cooldown)
+void isPressed(bool &calibrateMenu, int selectedItem)
 {
- return (millis() - lastTime >= cooldown);
-}
-
-// void liquidLevelCheck(bool is_liquid_detected)
-// {
-//   if(is_liquid_detected)
-//   {
-//     Serial.println("Liquid detected");
-//   }else
-//   {
-//     Serial.println("No liquid detected");
-//   }
-// }
-
-// void gasCounter(bool is_gas_sensor)
-// {
-//   if (!is_gas_sensor && !valveOpen)
-//   {
-//     counter++;
-//     Serial.println(counter);
-//     digitalWrite(VALVE_PIN, HIGH);
-//     valveStartTime = millis();
-//     valveOpen = true;
-//   }
-
-//   if (valveOpen && millis() - valveStartTime >= interval) // maybe replace millis - valve with (lastprint)
-//   {
-//     digitalWrite(VALVE_PIN, LOW);
-//     valveOpen = false;
-//   }
-// }
-
-
-
-void isPressed(bool &calibrateMenu, int selectedItem) // later to be optimized when multiple probes are utilized
-{
-  if (!digitalRead(SW_PIN)) 
+  if (!digitalRead(PIN_SW))
   {
     delay(200);  // debounce
-    while (!digitalRead(SW_PIN));  // wait until released
+    while (!digitalRead(PIN_SW));  // wait until released
+
     if (selectedItem == 0)
     {
       calibrateProbePH();
-    }else if(selectedItem == 3)
+    }
+    else if (selectedItem == 3)
     {
       calibrateProbeORP();
-    }else if(selectedItem == 6)
+    }
+    else if (selectedItem == 6)
     {
-      disableValves = !disableValves;
-      pHvalve.switchValve();
-      eLvalve.switchValve();
+      valvesDisabled = !valvesDisabled;
+      phValve.switchValve();
+      orpValve.switchValve();
       lcd.clear();
-      if(disableValves)
-      {
-        lcd.print("Valves off");
-      }else
-      {
-        lcd.print("Valves on");
-      }
+      lcd.print(valvesDisabled ? "Valves off" : "Valves on");
       delay(600);
       lcd.clear();
-    }else if (selectedItem == 7) 
+    }
+    else if (selectedItem == 7)
     {
       calibrateMenu = false;
       lcd.clear();
@@ -189,94 +147,69 @@ void isPressed(bool &calibrateMenu, int selectedItem) // later to be optimized w
   }
 }
 
-void analogControl(int& selectedItem)
+void analogControl(int &selectedItem)
 {
-  int yVal = analogRead(Y_PIN);
-  // Dead zone around the resting value (~1980)
+  int yVal = analogRead(PIN_JOYSTICK_Y);
   const int deadZone = 400;
 
-  if (yVal < 1980 - deadZone) 
-  {  // Up
-    if (selectedItem > 0)
-      selectedItem--;
+  if (yVal < 1980 - deadZone)  // Up
+  {
+    if (selectedItem > 0) selectedItem--;
     delay(200); // Debounce
-  } else if (yVal > 1980 + deadZone) 
-  {  // Down
-    if (selectedItem < 7)  // 6 is your "Done" item
-      selectedItem++;
+  }
+  else if (yVal > 1980 + deadZone)  // Down
+  {
+    if (selectedItem < 7) selectedItem++;
     delay(200); // Debounce
   }
 }
 
-
-
-void calibrateProbePH() 
+void calibrateProbePH()
 {
   int bufferSelection = 0;
   bool bufferCalibrated[3] = {false, false, false};
   bool selecting = true;
-
   lcd.clear();
 
-  while (selecting) 
+  while (selecting)
   {
     analogControl(bufferSelection);
     updateGlobalBlink();
 
-    // ph_val = readPH();   putting this on hold
-
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Select Buffer:");
-
-    for (const auto &item : calMenuChoices) 
-    {
-        printMenuItem(item.col, item.row, item.label, item.index, bufferSelection); // if your buffer selected matches the item index it blinks
-    }
-
-    // printMenuItem(0, 1, "pH 4", 0, bufferSelection);
-    // printMenuItem(0, 2, "pH 7", 1, bufferSelection);
-    // printMenuItem(0, 3, "pH 10", 2, bufferSelection);
-    // printMenuItem(10, 1, "Clear", 3, bufferSelection);  
-    // printMenuItem(10, 2, "Done", 4, bufferSelection);
-    // lcd.setCursor(10, 3);
-
-    // lcd.print("pH: ");
-    // lcd.print(ph_val, 3); // to the thousandths
-
 
     if (bufferCalibrated[0]) lcd.setCursor(6, 1), lcd.print("*");
     if (bufferCalibrated[1]) lcd.setCursor(6, 2), lcd.print("*");
     if (bufferCalibrated[2]) lcd.setCursor(6, 3), lcd.print("*");
 
-    
-    if (!digitalRead(SW_PIN))
+    if (!digitalRead(PIN_SW))
     {
-      // delay(200); the while loop should remove need for delay
-      while (!digitalRead(SW_PIN)); 
+      while (!digitalRead(PIN_SW));
 
-      switch (bufferSelection) 
+      switch (bufferSelection)
       {
         case 0:
-          ph_sensor.send_cmd("Cal,low,4.00");
+          phSensor.sendCmd("Cal,low,4.00");
           bufferCalibrated[0] = true;
           break;
         case 1:
-          ph_sensor.send_cmd("Cal,mid,7.00");
+          phSensor.sendCmd("Cal,mid,7.00");
           bufferCalibrated[1] = true;
           break;
         case 2:
-          ph_sensor.send_cmd("Cal,high,10.00");
+          phSensor.sendCmd("Cal,high,10.00");
           bufferCalibrated[2] = true;
           break;
-        case 3: 
-          ph_sensor.send_cmd("Cal,clear");
+        case 3:
+          phSensor.sendCmd("Cal,clear");
           bufferCalibrated[0] = bufferCalibrated[1] = bufferCalibrated[2] = false;
           lcd.clear();
           lcd.print("Calibration Cleared");
           delay(1500);
           lcd.clear();
           break;
-        case 4:  
+        case 4:
           lcd.clear();
           lcd.print("Returning");
           delay(1000);
@@ -285,7 +218,8 @@ void calibrateProbePH()
           break;
       }
     }
-    if (bufferCalibrated[0] && bufferCalibrated[1] && bufferCalibrated[2]) 
+
+    if (bufferCalibrated[0] && bufferCalibrated[1] && bufferCalibrated[2])
     {
       lcd.clear();
       lcd.print("All Calibrated!");
@@ -298,48 +232,33 @@ void calibrateProbePH()
 
 void calibrateProbeORP()
 {
-  int selectedItem = 0;  // Only one item for now, but this keeps it consistent
+  int selectedItem = 0;
   bool selecting = true;
-  int lastPrint = 0;
   lcd.clear();
 
-  while (selecting) 
+  while (selecting)
   {
     updateGlobalBlink();
-
-    // if(isCooldownOver(lastPrint, 4000)) // 4 second cooldown
-    // {
-    //   orp_val = readORP(); putting this idea on hold
-    // }
     lcd.setCursor(0, 0);
     lcd.print("Calibrate when ready");
-
     printMenuItem(0, 1, "Cal", 0, selectedItem);
     printMenuItem(0, 2, "Done", 1, selectedItem);
 
-    lcd.setCursor(5, 1);
-
-    // lcd.print("ORP: ");
-    // lcd.print(orp_val, 0);
-    // lcd.print(" mV     ");
-    
-
-
-    if (!digitalRead(SW_PIN))
+    if (!digitalRead(PIN_SW))
     {
-      delay(200);  // Debounce
-      while (!digitalRead(SW_PIN));  // Wait until released
-      switch(selectedItem)
+      delay(200);
+      while (!digitalRead(PIN_SW));
+      switch (selectedItem)
       {
         case 0:
-          orp_sensor.send_cmd("Cal,222");
+          orpSensor.sendCmd("Cal,222");
           lcd.clear();
           lcd.print("Calibrated at 222mV");
           delay(1000);
           selecting = false;
           lcd.clear();
           break;
-        case 1: 
+        case 1:
           lcd.clear();
           lcd.print("Returning");
           delay(1000);
@@ -352,25 +271,22 @@ void calibrateProbeORP()
 
 void displayWarning()
 {
-  bool bypass_warning = false; 
+  bool bypassWarning = false;
   lcd.clear();
-  while(!bypass_warning)
+  while (!bypassWarning)
   {
     updateGlobalBlink();
-
     lcd.setCursor(0, 0);
     lcd.print("WARNING:");
-    
     lcd.setCursor(0, 1);
     lcd.print("pH buffer not reacting");
-
     printMenuItem(0, 2, "Unlock System?", 0, 0);
 
-    if (!digitalRead(SW_PIN)) 
+    if (!digitalRead(PIN_SW))
     {
       delay(200);
-      while (!digitalRead(SW_PIN)); 
-      bypass_warning = true;
+      while (!digitalRead(PIN_SW));
+      bypassWarning = true;
       lcd.clear();
       lcd.print("System Unlocked");
       delay(700);
@@ -381,13 +297,13 @@ void displayWarning()
 
 void printData()
 {
-    lcd.setCursor(0, 0);
-    lcd.print("pH: ");
-    lcd.print(ph_val, 3); // To the thousandths
-    lcd.print("     "); // Clear leftover digits
-
-    lcd.setCursor(0, 1);
-    lcd.print("ORP: ");
-    lcd.print(orp_val, 0);
-    lcd.print(" mV     ");
+  lcd.setCursor(0, 0);
+  lcd.print("pH: ");
+  lcd.print(phValue, 3);
+  lcd.print("     ");
+  lcd.setCursor(0, 1);
+  lcd.print("ORP: ");
+  lcd.print(orpValue, 0);
+  lcd.print(" mV     ");
 }
+ 

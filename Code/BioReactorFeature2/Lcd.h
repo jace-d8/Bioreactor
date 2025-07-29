@@ -5,18 +5,18 @@
 #pragma once
 #include <LiquidCrystal_I2C.h>
 
-enum LCD_POS
+enum LcdPos
 {
   ROW_TITLE = 0,
   ROW_1 = 1,
   ROW_2 = 2,
   ROW_3 = 3,
   COL_LEFT = 0,
-  COL_MID = 6, 
+  COL_MID = 6,
   COL_RIGHT = 10
 };
 
-struct MenuItem 
+struct MenuItem
 {
   int col;
   int row;
@@ -29,11 +29,7 @@ extern MenuItem menuChoices[];
 extern MenuItem calMenuChoices[];
 
 void initLcd();
-
-void toggleMenu(); // the if(!digitalRead(SW_pin)) needs to become external to the function 
-
+void toggleMenu();
 void printLcdMenu(int selectedItem);
-
 void updateGlobalBlink();
-
 void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex);

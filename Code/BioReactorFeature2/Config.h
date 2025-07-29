@@ -1,32 +1,40 @@
 #pragma once
+#include <Arduino.h>
 
-const int SW_PIN = D2;
-const int Y_PIN = A1;
+// Pin Config
+const int PIN_SW = 5;            // D2
+const int PIN_JOYSTICK_Y = 2;    // A1
 const int PH_VALVE_PIN = 3;
 const int ORP_VALVE_PIN = 4; 
+
+// Thresholds
 const int PH_MINIMUM = 6.3;
 const int ORP_MINIMUM = -163;
-const int SD_CHIP_SELECT = 10;
-const unsigned long readInterval = 2000;
-const unsigned long hourInterval = 3600000UL;
-const unsigned long cooldownPeriod = 60000UL;
-const int phValveMaxActivations = 5;
-const unsigned long phResetWindow = 15 * 60 * 1000UL;
-const unsigned long blinkInterval = 300;
 
-// Adjust variables in config.cpp. // Consider getting rid of all these globals 
-extern bool disableValves;
-extern String inputString;
-extern unsigned long lastReadTime;
-extern unsigned long lastHourTime;
-extern unsigned long sDread;
-extern unsigned long pHread;
-extern unsigned long eLread;
+// SD
+const int SD_CHIP_SELECT = 10;
+
+// Timing
+const unsigned long SENSOR_READ_INTERVAL = 2000;
+const unsigned long HOUR_INTERVAL = 3600000UL;
+const unsigned long VALVE_COOLDOWN = 60000UL;
+const int PH_VALVE_MAX_ACTIVATIONS = 5;
+const unsigned long PH_RESET_WINDOW = 15 * 60 * 1000UL;
+const unsigned long BLINK_INTERVAL = 300;
+
+// Globals (consider removing these later), encapuslate in struct or something
+extern bool valvesDisabled;
+extern String serialInput;
+extern unsigned long lastSensorReadTime;
+extern unsigned long lastHourTrigger;
+extern unsigned long lastSdLogTime;
+extern unsigned long lastPhValveTime;
+extern unsigned long lastOrpValveTime;
 extern int phValveActivationCount;
-extern unsigned long lastPHactivation;
-extern bool isCleared;
+extern unsigned long lastPhActivation;
+extern bool lcdCleared;
 extern bool blinkState;
 extern unsigned long lastBlinkTime;
 
-extern float ph_val; 
-extern int orp_val; 
+extern float phValue; 
+extern int orpValue;

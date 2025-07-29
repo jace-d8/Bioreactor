@@ -1,31 +1,27 @@
-//
-// Created by Jace Dunn on 7/14/25.
-//
-
 #pragma once
-
 #include <Ezo_i2c.h>
 
-class EzoBoard{
+class EzoBoard {
 private:
-  Ezo_board ezo; 
-  int address;
-  String probe_type; 
-  char response[32]; // Buffer for response
+  Ezo_board ezo_;
+  int address_;
+  String probeType_;
+  char response_[32];
 
-public: 
-  EzoBoard(int a, String s) : ezo(a, s.c_str()), address(a), probe_type(s) {}
+public:
+  EzoBoard(int a, String s)
+    : ezo_(a, s.c_str()), address_(a), probeType_(s) {}
 
   float read()
   {
-    ezo.send_cmd("R");         // Send read command
-    delay(900);                      // Wait for the sensor to respond
-    ezo.receive_cmd(response, sizeof(response));  // Read response into buffer
-    return atof(response);
+    ezo_.send_cmd("R");
+    delay(900);
+    ezo_.receive_cmd(response_, sizeof(response_));
+    return atof(response_);
   }
 
   void sendCmd(String cmd)
   {
-    ezo.send_cmd(cmd.c_str());
+    ezo_.send_cmd(cmd.c_str());
   }
 };
