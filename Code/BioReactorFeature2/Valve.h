@@ -2,8 +2,7 @@
 // Created by Jace Dunn on 7/14/25.
 //
 
-#ifndef VALVE_H
-#define VALVE_H
+#pragma once
 
 class Valve{
 private:

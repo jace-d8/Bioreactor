@@ -1,24 +1,51 @@
 #include "Lcd.h"
 
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+MenuItem menuChoices[] = {
+    { COL_LEFT, ROW_1, "pH 1",  0 },
+    { COL_LEFT, ROW_2, "pH 2",  1 },
+    { COL_LEFT, ROW_3, "pH 3",  2 },
+    { COL_MID, ROW_1, "ORP 1", 3 },
+    { COL_MID, ROW_2, "ORP 2", 4 },
+    { COL_MID, ROW_3, "ORP 3", 5 }
+};
+
+MenuItem calMenuChoices[] = {
+    { COL_LEFT,  ROW_1, "pH 4",  0 },
+    { COL_LEFT,  ROW_2, "pH 7",  1 },
+    { COL_LEFT,  ROW_3, "pH 10", 2 },
+    { COL_RIGHT, ROW_1, "Clear", 3 },
+    { COL_RIGHT, ROW_2, "Done",  4 }
+};
+
+void initLcd()
+{
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(COL_LEFT, ROW_TITLE);
+  lcd.print("LCD initilized; Reading Probes");
+}
+
 void toggleMenu() // the if(!digitalRead(SW_pin)) needs to become external to the function 
 {
   bool calibrateMenu = false;
   int selectedItem = -1;  // 0 = pH Probe 1, 1 = pH Probe 2...
-  if(!digitalRead(SW_pin))
-  {
-    delay(200);  // debounce
-    calibrateMenu = true; 
-    selectedItem = 0;
-    lcd.clear();
-    while(calibrateMenu)
-    {
-      analogControl(selectedItem);
-      updateGlobalBlink();
+  // if(!digitalRead(SW_PIN))
+  // {
+  //   delay(200);  // debounce
+  //   calibrateMenu = true; 
+  //   selectedItem = 0;
+  //   lcd.clear();
+  //   while(calibrateMenu)
+  //   {
+  //     analogControl(selectedItem);
+  //     updateGlobalBlink();
 
-      printMenu(selectedItem);
-      isPressed(calibrateMenu, selectedItem);
-    }
-  }
+  //     printMenu(selectedItem);
+  //     isPressed(calibrateMenu, selectedItem);
+  //   }
+  // }
 }
 
 void printLcdMenu(int selectedItem)

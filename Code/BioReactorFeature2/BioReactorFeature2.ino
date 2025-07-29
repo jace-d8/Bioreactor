@@ -1,89 +1,55 @@
+#include <Wire.h>
+
+
+
+// File includes 
+#include "Config.h"
+#include "Valve.h"
+#include "EzoBoard.h"
+#include "Lcd.h"
+#include "Sd.h"
 
 // Probes
 Ezo_board orp_sensor(98, "ORP");  
 Ezo_board ph_sensor(99, "PH");  
 
-// Probe Vals
-float ph_val = 0.0; // I want these globally avaliable
-int orp_val = 0; 
-
 // Valves
 Valve pHvalve(PH_VALVE_PIN, 10000);
 Valve eLvalve(ORP_VALVE_PIN, 4000);
 
-// Note: I will consider using classes for further modularization
+// Probe Vals
+float ph_val = 0.0; // Consider changing these to some local scope 
+int orp_val = 0; 
 
-void logToSD(String message = "");
 
-// LCD layout constants
-enum LCD_POS {
-    ROW_TITLE = 0,
-    ROW_1 = 1,
-    ROW_2 = 2,
-    ROW_3 = 3,
-    COL_LEFT = 0,
-    COL_MID = 6, 
-    COL_RIGHT = 10
-};
-
-struct MenuItem {
-    int col;
-    int row;
-    const char* label;
-    int index;
-};
-
-MenuItem menuChoices[] = {
-    { COL_LEFT, ROW_1, "pH 1",  0 },
-    { COL_LEFT, ROW_2, "pH 2",  1 },
-    { COL_LEFT, ROW_3, "pH 3",  2 },
-    { COL_MID, ROW_1, "ORP 1", 3 },
-    { COL_MID, ROW_2, "ORP 2", 4 },
-    { COL_MID, ROW_3, "ORP 3", 5 }
-}
-
-MenuItem calMenuChoices[] = {
-    { COL_LEFT,  ROW_1, "pH 4",  0 },
-    { COL_LEFT,  ROW_2, "pH 7",  1 },
-    { COL_LEFT,  ROW_3, "pH 10", 2 },
-    { COL_RIGHT, ROW_1, "Clear", 3 },
-    { COL_RIGHT, ROW_2, "Done",  4 }
-};
 
 void setup()
 {
-  Serial.begin(9600);
-  Wire.setClock(1000000);  // Set I2C speed to 100kHz
+  Serial.begin(9600); // Init serial comms at 9600 baud
+  Wire.begin();  // Init i2c 
+  Wire.setClock(400000);   // Set I2C speed to 400 kHz (Fast Mode)
 
-
-  pinMode(PH_VALVE_PIN, OUTPUT);  // For pHvalve
-  pinMode(ORP_VALVE_PIN, OUTPUT);  // For eLvalve
+  pinMode(PH_VALVE_PIN, OUTPUT);  
+  pinMode(ORP_VALVE_PIN, OUTPUT);  
   
   // pinMode(LIQUID_SENSOR_PIN, INPUT);  
   // pinMode(GAS_SENSOR_PIN, INPUT); // Liquid detection sensor in U-tube
   // pinMode(VALVE_PIN, OUTPUT); // Controls state of 3 way valve
 
-  //pinMode(SW_pin, INPUT); // Setup SW input
-  //digitalWrite(SW_pin, HIGH);  // Reading button state: 1 = not pressed, 0 = pressed
+  //pinMode(SW_PIN, INPUT); // Setup SW input
+  //digitalWrite(SW_PIN, HIGH);  // Reading button state: 1 = not pressed, 0 = pressed
   // The above two lines are for normal arduino, the below is for the nano esp32
-  pinMode(SW_pin, INPUT_PULLUP);  
+  pinMode(SW_PIN, INPUT_PULLUP);  
   //delay(100);
 
 
-
-  Wire.begin();       
-
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("Reading Probes");
+  initLcd();
   lcd.setCursor(0, 1);
-  
-  if (SD.begin(chipSelect)) 
+  if (SD.begin(SD_CHIP_SELECT)) 
   {
     lcd.print("SD initilzed");
-    dataFile = SD.open("/data.csv", FILE_WRITE);
-    dataFile.println("DATE,PH,ORP");
+    //dataFile = SD.open("/data.csv", FILE_WRITE);
+    // dataFile.println("DATE,PH,ORP");
   }else
   {
     lcd.print("SD failed");
@@ -100,8 +66,8 @@ void loop()
 
   if (isCooldownOver(readInterval, lastReadTime)) 
   {
-    ph_val = readPH();  // Convert char* to float
-    orp_val = readORP();
+    ph_val = ph_sensor.read();  // Convert char* to float
+    orp_val = orp_sensor.read();
     if(!isCleared)
     {
       lcd.clear(); // consider optimizing
@@ -111,12 +77,12 @@ void loop()
     lastReadTime = millis();
   }
 
-  if(isCooldownOver(SDread, 120000)) // 2 min, will change later
+  if(isCooldownOver(sDread, 120000)) // 2 min, will change later
   {
     logToSD(); 
-    SDread = millis(); 
+    sDread = millis(); 
   }
-  if ((ph_val < PH_MIN) && isCooldownOver(pHread, cooldownPeriod)) 
+  if ((ph_val < PH_MINIMUM) && isCooldownOver(pHread, cooldownPeriod)) 
   {
     pHvalve.open();
     pHread = millis(); 
@@ -136,7 +102,7 @@ void loop()
       phValveActivationCount = 0;  // reset after warning
     }
   }
-  if((orp_val < ORP_MIN) && isCooldownOver(eLread, cooldownPeriod)) // COOLDOWN DOES NOT CURRENTLY ACCOUNT FOR 10 SECONDS OF ACTIVATION
+  if((orp_val < ORP_MINIMUM) && isCooldownOver(eLread, cooldownPeriod)) // COOLDOWN DOES NOT CURRENTLY ACCOUNT FOR 10 SECONDS OF ACTIVATION
   {
     eLvalve.open();
     eLread = millis(); 
@@ -149,7 +115,7 @@ void loop()
 
   pHvalve.update();
   eLvalve.update(); 
-  lcdMenu();
+  toggleMenu(); // put in if statement
 }
 
 bool isCooldownOver(unsigned long lastTime, unsigned long cooldown)
@@ -190,10 +156,10 @@ bool isCooldownOver(unsigned long lastTime, unsigned long cooldown)
 
 void isPressed(bool &calibrateMenu, int selectedItem) // later to be optimized when multiple probes are utilized
 {
-  if (!digitalRead(SW_pin)) 
+  if (!digitalRead(SW_PIN)) 
   {
     delay(200);  // debounce
-    while (!digitalRead(SW_pin));  // wait until released
+    while (!digitalRead(SW_PIN));  // wait until released
     if (selectedItem == 0)
     {
       calibrateProbePH();
@@ -225,7 +191,7 @@ void isPressed(bool &calibrateMenu, int selectedItem) // later to be optimized w
 
 void analogControl(int& selectedItem)
 {
-  int yVal = analogRead(Y_pin);
+  int yVal = analogRead(Y_PIN);
   // Dead zone around the resting value (~1980)
   const int deadZone = 400;
 
@@ -262,7 +228,7 @@ void calibrateProbePH()
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Select Buffer:");
 
-    for (const auto &item : menuItems) 
+    for (const auto &item : calMenuChoices) 
     {
         printMenuItem(item.col, item.row, item.label, item.index, bufferSelection); // if your buffer selected matches the item index it blinks
     }
@@ -283,10 +249,10 @@ void calibrateProbePH()
     if (bufferCalibrated[2]) lcd.setCursor(6, 3), lcd.print("*");
 
     
-    if (!digitalRead(SW_pin))
+    if (!digitalRead(SW_PIN))
     {
       // delay(200); the while loop should remove need for delay
-      while (!digitalRead(SW_pin)); 
+      while (!digitalRead(SW_PIN)); 
 
       switch (bufferSelection) 
       {
@@ -359,10 +325,10 @@ void calibrateProbeORP()
     
 
 
-    if (!digitalRead(SW_pin))
+    if (!digitalRead(SW_PIN))
     {
       delay(200);  // Debounce
-      while (!digitalRead(SW_pin));  // Wait until released
+      while (!digitalRead(SW_PIN));  // Wait until released
       switch(selectedItem)
       {
         case 0:
@@ -372,6 +338,7 @@ void calibrateProbeORP()
           delay(1000);
           selecting = false;
           lcd.clear();
+          break;
         case 1: 
           lcd.clear();
           lcd.print("Returning");
@@ -399,10 +366,10 @@ void displayWarning()
 
     printMenuItem(0, 2, "Unlock System?", 0, 0);
 
-    if (!digitalRead(SW_pin)) 
+    if (!digitalRead(SW_PIN)) 
     {
       delay(200);
-      while (!digitalRead(SW_pin)); 
+      while (!digitalRead(SW_PIN)); 
       bypass_warning = true;
       lcd.clear();
       lcd.print("System Unlocked");
