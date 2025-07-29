@@ -65,8 +65,6 @@ void loop() // minimize delay() and cut down on non modularized logic
 }
 
 // Will stay in the .ino
-
-// Will stay in the .ino
 void analogControl(int &selectedItem) // Consider testing if debounce is needed 
 {
   int yVal = analogRead(PinConfigurations::PIN_JOYSTICK_Y);
