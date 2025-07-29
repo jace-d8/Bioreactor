@@ -1,0 +1,43 @@
+//
+// Created by Jace Dunn on 7/29/25.
+//
+#pragma once
+#include "Config.h"
+#include "EzoBoard.h"
+
+
+struct MenuItem {
+    int col;
+    int row;
+    const char* label;
+    int index;
+};
+
+enum MenuIndices
+{
+  MENU_PH1 = 0,
+  MENU_PH2,
+  MENU_PH3,
+  MENU_ORP1,
+  MENU_ORP2,
+  MENU_ORP3,
+  MENU_VALVE_TOGGLE,
+  MENU_DONE
+};
+
+extern MenuItem menuChoices[];
+extern MenuItem calMenuChoices[];
+
+void toggleMenu(ConfigState& config, EzoBoard& phSensor, EzoBoard& orpSensor);
+void analogControl(int& selectedItem);
+void isPressed(bool &calibrateMenu, int selectedItem, ConfigState& config, EzoBoard& phSensor, EzoBoard& orpSensor);
+
+// Menu display
+void printLcdMenu(ConfigState& config, int selectedItem);
+void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex);
+void displayWarning(ConfigState& config);
+
+// Calibration
+void calibrateProbePH(ConfigState& config, EzoBoard& phSensor);
+void calibrateProbeORP(ConfigState& config, EzoBoard& orpSensor);
+

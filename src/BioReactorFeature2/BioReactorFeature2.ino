@@ -5,6 +5,7 @@
 #include "Lcd.h"
 #include "Sd.h"
 #include "Timer.h"
+#include "Menu.h"
 
 // Probes
 EzoBoard orpSensor(98, "ORP");
@@ -20,6 +21,7 @@ Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
 Timer orpFlushTimer(TimingIntervals::HOUR_INTERVAL);
 Timer phCountResetTimer(TimingIntervals::PH_RESET_WINDOW);
+Timer orpCountResetTimer(TimingIntervals::ORP_RESET_WINDOW);
 Timer valveCooldownTimer(TimingIntervals::VALVE_COOLDOWN);
 
 
@@ -62,27 +64,10 @@ void loop() // minimize delay() and cut down on non modularized logic
   phValve.update();
   orpValve.update();
   
-  toggleMenu(config);
+  toggleMenu(config, phSensor, orpSensor);
 }
 
-// Will stay in the .ino
-void analogControl(int &selectedItem) // Consider testing if debounce is needed 
-{
-  int yVal = analogRead(PinConfigurations::PIN_JOYSTICK_Y);
-  const int deadZone = 400;
-  const int range = 1980; 
 
-  if (yVal < range - deadZone)  // Up
-  {
-    if (selectedItem > MENU_PH1) selectedItem--;
-    delay(200); // Debounce
-  }
-  else if (yVal > range + deadZone)  // Down
-  {
-    if (selectedItem < MENU_DONE) selectedItem++;
-    delay(200); // Debounce
-  }
-}
 
 // tmp... make task class? 
 void handleProbeReads(ConfigState& config)
@@ -123,152 +108,23 @@ void handlePhValve()
 void handleOrpValve()
 {
   orpValve.open();
-  // Warning logic here...
+  if (orpCountResetTimer.isReady())
+  {
+    config.orpValveActivationCount = 1;
+  }
+  else
+  {
+    config.orpValveActivationCount++;
+  }
+
+  if (config.orpValveActivationCount >= TimingIntervals::ORP_VALVE_MAX_ACTIVATIONS)
+  {
+    displayWarning(config);
+    config.orpValveActivationCount = 0;
+  }
 }
 // tmp 
 
 
-
-// This needs reworked
-void isPressed(ConfigState& config, bool &calibrateMenu, int selectedItem)  
-{
-  if (!digitalRead(PinConfigurations::PIN_SW))
-  {
-    delay(200);  // debounce
-    while (!digitalRead(PinConfigurations::PIN_SW));  // wait until released
-
-    if (selectedItem == MENU_PH1)
-    {
-      calibrateProbePH(config);
-    }
-    else if (selectedItem == MENU_ORP1)
-    {
-      calibrateProbeORP(config);
-    }
-    else if (selectedItem == MENU_VALVE_TOGGLE)
-    {
-      config.valvesDisabled = !config.valvesDisabled;
-      phValve.switchValve();
-      orpValve.switchValve();
-      lcd.clear();
-      lcd.print(config.valvesDisabled ? "Valves off" : "Valves on");
-      delay(600);
-      lcd.clear();
-    }
-    else if (selectedItem == MENU_DONE)
-    {
-      calibrateMenu = false;
-      lcd.clear();
-    }
-  }
-}
-
-
-
-// Break down and move 
-void calibrateProbePH(ConfigState& config)
-{
-  int bufferSelection = 0;
-  bool bufferCalibrated[3] = {false, false, false};
-  bool selecting = true;
-  lcd.clear();
-
-  while (selecting)
-  {
-    analogControl(bufferSelection);
-    updateGlobalBlink(config);
-
-    lcd.setCursor(COL_LEFT, ROW_TITLE);
-    lcd.print("Select Buffer:");
-
-    if (bufferCalibrated[0]) lcd.setCursor(COL_MID, ROW_1), lcd.print("*");
-    if (bufferCalibrated[1]) lcd.setCursor(COL_MID, ROW_2), lcd.print("*");
-    if (bufferCalibrated[2]) lcd.setCursor(COL_MID, ROW_3), lcd.print("*");
-
-    if (!digitalRead(PinConfigurations::PIN_SW))
-    {
-      while (!digitalRead(PinConfigurations::PIN_SW));
-
-      switch (bufferSelection)
-      {
-        case 0:
-          phSensor.sendCmd("Cal,low,4.00");
-          bufferCalibrated[0] = true;
-          break;
-        case 1:
-          phSensor.sendCmd("Cal,mid,7.00");
-          bufferCalibrated[1] = true;
-          break;
-        case 2:
-          phSensor.sendCmd("Cal,high,10.00");
-          bufferCalibrated[2] = true;
-          break;
-        case 3:
-          phSensor.sendCmd("Cal,clear");
-          bufferCalibrated[0] = bufferCalibrated[1] = bufferCalibrated[2] = false;
-          lcd.clear();
-          lcd.print("Calibration Cleared");
-          delay(1500);
-          lcd.clear();
-          break;
-        case 4:
-          lcd.clear();
-          lcd.print("Returning");
-          delay(1000);
-          lcd.clear();
-          selecting = false;
-          break;
-      }
-    }
-
-    if (bufferCalibrated[0] && bufferCalibrated[1] && bufferCalibrated[2])
-    {
-      lcd.clear();
-      lcd.print("All Calibrated!");
-      delay(800);
-      lcd.clear();
-      selecting = false;
-    }
-  }
-}
-
-void calibrateProbeORP(ConfigState& config)
-{
-  int selectedItem = 0;
-  bool selecting = true;
-  lcd.clear();
-
-  while (selecting)
-  {
-    updateGlobalBlink(config);
-    lcd.setCursor(COL_LEFT, ROW_TITLE);
-    lcd.print("Calibrate when ready");
-    printMenuItem(COL_LEFT, ROW_1, "Cal", 0, selectedItem);
-    printMenuItem(COL_LEFT, ROW_2, "Done", 1, selectedItem);
-
-    if (!digitalRead(PinConfigurations::PIN_SW))
-    {
-      delay(200);
-      while (!digitalRead(PinConfigurations::PIN_SW));
-      switch (selectedItem)
-      {
-        case 0:
-          orpSensor.sendCmd("Cal,222");
-          lcd.clear();
-          lcd.print("Calibrated at 222mV");
-          delay(1000);
-          selecting = false;
-          lcd.clear();
-          break;
-        case 1:
-          lcd.clear();
-          lcd.print("Returning");
-          delay(1000);
-          selecting = false;
-          lcd.clear();
-      }
-    }
-  }
-}
 
 

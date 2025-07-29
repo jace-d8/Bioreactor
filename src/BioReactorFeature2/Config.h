@@ -23,8 +23,10 @@ namespace TimingIntervals // Counted in milliseconds; anything larger than 32,76
   const unsigned long SD_LOG_INTERVAL = 120000UL;
   const unsigned long HOUR_INTERVAL = 3600000UL;
   const unsigned long VALVE_COOLDOWN = 60000UL;
-  const int PH_VALVE_MAX_ACTIVATIONS = 5; 
-  const unsigned long PH_RESET_WINDOW = 15 * 60 * 1000UL;
+  const int PH_VALVE_MAX_ACTIVATIONS = 3; 
+  const int ORP_VALVE_MAX_ACTIVATIONS = 4; 
+  const unsigned long PH_RESET_WINDOW = 4 * 60 * 1000UL; // 4 min
+  const unsigned long ORP_RESET_WINDOW = 4 * 60 * 1000UL; // 4 min
   const unsigned long BLINK_INTERVAL = 300UL;
 }
 
@@ -35,6 +37,7 @@ struct ConfigState
 {
   String serialInput = "";
   int phValveActivationCount = 0;
+  int orpValveActivationCount = 0;
   bool valvesDisabled = false;
   bool lcdCleared = false;
   bool blinkState = true;
