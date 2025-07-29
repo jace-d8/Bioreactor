@@ -5,5 +5,6 @@
 
 #define UTC_OFFSET (-7 * 3600)
 
+void initSD(); 
 void setTimeFromBuild();
 void logToSD(ConfigState& config, String message = "");

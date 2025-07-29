@@ -1,7 +1,19 @@
 #include "Sd.h"
 #include "Lcd.h"
 
-File dataFile; // Consider proper error handling
+File dataFile; // Consider proper error handling and move somewhere better
+
+void initSD()
+{
+  if (SD.begin(SD_CHIP_SELECT))
+  {
+    lcd.print("SD initialized");
+  }
+  else
+  {
+    lcd.print("SD failed");
+  }
+}
 
 void setTimeFromBuild()
 {

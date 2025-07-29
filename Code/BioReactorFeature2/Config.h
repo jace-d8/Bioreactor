@@ -19,7 +19,8 @@ namespace Thresholds
 
 namespace TimingIntervals // Counted in milliseconds; anything larger than 32,767 MUST be followed by UL
 {
-  const unsigned long SENSOR_READ_INTERVAL = 2000UL;
+  const unsigned long PROBE_READ_INTERVAL = 2000UL;
+  const unsigned long SD_LOG_INTERVAL = 120000UL;
   const unsigned long HOUR_INTERVAL = 3600000UL;
   const unsigned long VALVE_COOLDOWN = 60000UL;
   const int PH_VALVE_MAX_ACTIVATIONS = 5; 
@@ -34,7 +35,7 @@ struct ConfigState
 {
   bool valvesDisabled = false;
   String serialInput = "";
-  unsigned long lastSensorReadTime = 0;
+  unsigned long lastProbeReadTime = 0;
   unsigned long lastHourTrigger = 0;
   unsigned long lastSdLogTime = 0;
   unsigned long lastPhValveTime = 0;

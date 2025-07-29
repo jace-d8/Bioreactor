@@ -10,11 +10,19 @@ EzoBoard orpSensor(98, "ORP");
 EzoBoard phSensor(99, "PH");
 
 // Valves
-Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000);
-Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000);
+Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000); // Open for 10 seconds
+Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000); // Open for 4 seconds 
+// Recall the open time is counted as cooldown waiting period
+
+// Timers
+Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
+Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
+Timer orpFlushTimer(TimingIntervals::HOUR_INTERVAL);
+
 
 // Single runtime config
 ConfigState config;
+// Consider only passing needed vars to functions instead of full struct 
 
 void setup()
 {
@@ -28,20 +36,9 @@ void setup()
 
   initLcd();
   // lcd.setCursor(COL_LEFT, ROW_1); forgot what this does 
-
-  // Needs to be moved 
-  if (SD.begin(SD_CHIP_SELECT))
-  {
-    lcd.print("SD initialized");
-  }
-  else
-  {
-    lcd.print("SD failed");
-  }
+  initSD();
 
   // lcd.setCursor(COL_LEFT, ROW_2); Idk why this was here
-
-
   configTime(UTC_OFFSET, 0, ""); // This should be either computer time or last counted time, whichever is "higher"
   setTimeFromBuild(); // This too 
 }
@@ -49,25 +46,10 @@ void setup()
 void loop() // minimize delay() and cut down on non modularized logic
 { 
   // Periodic sensor reads
-  if (isCooldownOver(TimingIntervals::SENSOR_READ_INTERVAL, config.lastSensorReadTime))
-  {
-    config.phValue = phSensor.read();
-    config.orpValue = orpSensor.read();
-    if (!config.lcdCleared)
-    {
-      lcd.clear();
-      config.lcdCleared = true;
-    }
-    printData(config);
-    config.lastSensorReadTime = millis();
-  }
-
+  if (probeTimer.isReady()) handleProbeReads(config);
   // Periodic SD logging
-  if (isCooldownOver(120000, config.lastSdLogTime)) // 2 min
-  {
-    logToSD(config);
-    config.lastSdLogTime = millis();
-  }
+  if (sdLogTiemr.isReady()) logToSD(config);
+    
 
   // PH Valve Control
   if ((config.phValue < Thresholds::PH_MINIMUM) && isCooldownOver(TimingIntervals::VALVE_COOLDOWN, config.lastPhValveTime))
@@ -99,14 +81,9 @@ void loop() // minimize delay() and cut down on non modularized logic
     orpValve.open();
     config.lastOrpValveTime = millis();
   }
-
+  
   // Hourly ORP flush
-  if (isCooldownOver(TimingIntervals::HOUR_INTERVAL, config.lastHourTrigger))
-  {
-    orpValve.open();
-    config.lastHourTrigger = millis();
-  }
-
+  if (orpFlushTimer.isReady()) orpValve.open();
   phValve.update();
   orpValve.update();
   toggleMenu(config);
@@ -119,22 +96,43 @@ bool isCooldownOver(unsigned long cooldown, unsigned long lastTime)
 }
 
 // Will stay in the .ino
-void analogControl(int &selectedItem)
+void analogControl(int &selectedItem) // Consider testing if debounce is needed 
 {
   int yVal = analogRead(PinConfigurations::PIN_JOYSTICK_Y);
   const int deadZone = 400;
+  const int range = 1980; 
 
-  if (yVal < 1980 - deadZone)  // Up
+  if (yVal < range - deadZone)  // Up
   {
     if (selectedItem > MENU_PH1) selectedItem--;
     delay(200); // Debounce
   }
-  else if (yVal > 1980 + deadZone)  // Down
+  else if (yVal > range + deadZone)  // Down
   {
     if (selectedItem < MENU_DONE) selectedItem++;
     delay(200); // Debounce
   }
 }
+
+// tmp 
+void handleProbeReads(ConfigState& config)
+{
+  config.phValue = phSensor.read();
+  config.orpValue = orpSensor.read();
+
+  // Look into fixes for this lcd.cleared check... 
+  if (!config.lcdCleared)
+  {
+    lcd.clear();
+    config.lcdCleared = true;
+  }
+
+  printData(config);
+  config.lastProbeReadTime = millis();
+}
+// tmp 
+
+
 
 // This needs reworked
 void isPressed(ConfigState& config, bool &calibrateMenu, int selectedItem)  
