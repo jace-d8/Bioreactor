@@ -4,6 +4,7 @@
 #include "EzoBoard.h"
 #include "Lcd.h"
 #include "Sd.h"
+#include "Timer.h"
 
 // Probes
 EzoBoard orpSensor(98, "ORP");
@@ -18,6 +19,8 @@ Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000); // Open for 4 seconds
 Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
 Timer orpFlushTimer(TimingIntervals::HOUR_INTERVAL);
+Timer phCountResetTimer(TimingIntervals::PH_RESET_WINDOW);
+Timer valveCooldownTimer(TimingIntervals::VALVE_COOLDOWN);
 
 
 // Single runtime config
@@ -48,52 +51,20 @@ void loop() // minimize delay() and cut down on non modularized logic
   // Periodic sensor reads
   if (probeTimer.isReady()) handleProbeReads(config);
   // Periodic SD logging
-  if (sdLogTiemr.isReady()) logToSD(config);
-    
-
+  if (sdLogTimer.isReady()) logToSD(config);
   // PH Valve Control
-  if ((config.phValue < Thresholds::PH_MINIMUM) && isCooldownOver(TimingIntervals::VALVE_COOLDOWN, config.lastPhValveTime))
-  {
-    phValve.open();
-    config.lastPhValveTime = millis();
-
-    // Valve activation count logic
-    if (millis() - config.lastPhActivation > TimingIntervals::PH_RESET_WINDOW)
-    {
-      config.phValveActivationCount = 1;
-    }
-    else
-    {
-      config.phValveActivationCount++;
-    }
-    config.lastPhActivation = millis();
-
-    if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS)
-    {
-      displayWarning(config);
-      config.phValveActivationCount = 0;
-    }
-  }
-
+  if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimer.isReady()) handlePhValve(); 
   // ORP Valve Control
-  if ((config.orpValue < Thresholds::ORP_MINIMUM) && isCooldownOver(TimingIntervals::VALVE_COOLDOWN, config.lastOrpValveTime))
-  {
-    orpValve.open();
-    config.lastOrpValveTime = millis();
-  }
-  
+  if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady()) orpValve.open();
   // Hourly ORP flush
   if (orpFlushTimer.isReady()) orpValve.open();
+
   phValve.update();
   orpValve.update();
   toggleMenu(config);
 }
 
 // Will stay in the .ino
-bool isCooldownOver(unsigned long cooldown, unsigned long lastTime)
-{
-  return (millis() - lastTime >= cooldown);
-}
 
 // Will stay in the .ino
 void analogControl(int &selectedItem) // Consider testing if debounce is needed 
@@ -114,7 +85,7 @@ void analogControl(int &selectedItem) // Consider testing if debounce is needed
   }
 }
 
-// tmp 
+// tmp... make task class? 
 void handleProbeReads(ConfigState& config)
 {
   config.phValue = phSensor.read();
@@ -128,7 +99,32 @@ void handleProbeReads(ConfigState& config)
   }
 
   printData(config);
-  config.lastProbeReadTime = millis();
+}
+
+void handlePhValve()
+{
+  phValve.open();
+
+  if (phCountResetTimer.isReady())
+  {
+    config.phValveActivationCount = 1;
+  }
+  else
+  {
+    config.phValveActivationCount++;
+  }
+
+  if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS)
+  {
+    displayWarning(config);
+    config.phValveActivationCount = 0;
+  }
+}
+
+void handleOrpValve()
+{
+  orpValve.open();
+  // Warning logic here...
 }
 // tmp 
 
