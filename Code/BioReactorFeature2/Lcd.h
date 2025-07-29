@@ -1,9 +1,9 @@
 //
 // Created by Jace Dunn on 7/28/25.
 //
-
 #pragma once
 #include <LiquidCrystal_I2C.h>
+#include "Config.h"
 
 enum LcdPos
 {
@@ -29,7 +29,8 @@ extern MenuItem menuChoices[];
 extern MenuItem calMenuChoices[];
 
 void initLcd();
-void toggleMenu();
-void printLcdMenu(int selectedItem);
-void updateGlobalBlink();
+void toggleMenu(ConfigState& config);
+void printLcdMenu(ConfigState& config, int selectedItem);
+void updateGlobalBlink(ConfigState& config);
 void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex);
+

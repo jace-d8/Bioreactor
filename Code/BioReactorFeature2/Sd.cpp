@@ -1,8 +1,7 @@
 #include "Sd.h"
 #include "Lcd.h"
-#include "Config.h"
 
-File dataFile; // Consider errory handling
+File dataFile; // Consider proper error handling
 
 void setTimeFromBuild()
 {
@@ -23,7 +22,7 @@ void setTimeFromBuild()
   }
 }
 
-void logToSD(String message)
+void logToSD(ConfigState& config, String message)
 {
   time_t now = time(nullptr);
   struct tm* timeinfo = localtime(&now);
@@ -43,8 +42,8 @@ void logToSD(String message)
                     timeinfo->tm_hour,
                     timeinfo->tm_min,
                     timeinfo->tm_sec,
-                    phValue,
-                    orpValue);
+                    config.phValue,
+                    config.orpValue);
     dataFile.flush();
   }
   else

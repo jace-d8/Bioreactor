@@ -1,5 +1,4 @@
 #include "Lcd.h"
-#include "Config.h"
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
@@ -28,12 +27,12 @@ void initLcd()
   lcd.print("LCD initialized; Reading Probes");
 }
 
-void toggleMenu()
+void toggleMenu(ConfigState& config)
 {
-  // Implementation TBD (existing logic kept unchanged)
+  // Placeholder for menu logic
 }
 
-void printLcdMenu(int selectedItem)
+void printLcdMenu(ConfigState& config, int selectedItem)
 {
   lcd.setCursor(COL_LEFT, ROW_TITLE);
   lcd.print("Calibrate Probe:");
@@ -43,28 +42,30 @@ void printLcdMenu(int selectedItem)
   printMenuItem(6, 1, "ORP 1", 3, selectedItem);
   printMenuItem(6, 2, "ORP 2", 4, selectedItem);
   printMenuItem(6, 3, "ORP 3", 5, selectedItem);
-  if (valvesDisabled)
+  if (config.valvesDisabled)
     printMenuItem(13, 1, "Vl ON", 6, selectedItem);
   else
     printMenuItem(13, 1, "Vl OFF", 6, selectedItem);
   printMenuItem(13, 2, "Done", 7, selectedItem);
 }
 
-void updateGlobalBlink()
+void updateGlobalBlink(ConfigState& config)
 {
   unsigned long currentMillis = millis();
-  if (currentMillis - lastBlinkTime >= BLINK_INTERVAL)
+  if (currentMillis - config.lastBlinkTime >= TimingIntervals::BLINK_INTERVAL)
   {
-    blinkState = !blinkState;
-    lastBlinkTime = currentMillis;
+    config.blinkState = !config.blinkState;
+    config.lastBlinkTime = currentMillis;
   }
 }
 
 void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex)
 {
   lcd.setCursor(col, row);
-  if (itemIndex == selectedIndex && blinkState)
+  if (itemIndex == selectedIndex)
     lcd.print("      ");
   else
     lcd.print(label);
+}
+
 }

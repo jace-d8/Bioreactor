@@ -30,20 +30,20 @@ namespace TimingIntervals
 // SD
 const int SD_CHIP_SELECT = 10;
 
-
-// Globals (consider removing these later), encapuslate in struct or something. NAMESPACE
-extern bool valvesDisabled;
-extern String serialInput;
-extern unsigned long lastSensorReadTime;
-extern unsigned long lastHourTrigger;
-extern unsigned long lastSdLogTime;
-extern unsigned long lastPhValveTime;
-extern unsigned long lastOrpValveTime;
-extern int phValveActivationCount;
-extern unsigned long lastPhActivation;
-extern bool lcdCleared;
-extern bool blinkState;
-extern unsigned long lastBlinkTime;
-
-extern float phValue; 
-extern int orpValue;
+struct ConfigState 
+{
+  bool valvesDisabled = false;
+  String serialInput = "";
+  unsigned long lastSensorReadTime = 0;
+  unsigned long lastHourTrigger = 0;
+  unsigned long lastSdLogTime = 0;
+  unsigned long lastPhValveTime = 0;
+  unsigned long lastOrpValveTime = 0;
+  int phValveActivationCount = 0;
+  unsigned long lastPhActivation = 0;
+  bool lcdCleared = false;
+  bool blinkState = true;
+  unsigned long lastBlinkTime = 0;
+  float phValue = 0.0f;
+  int orpValue = 0;
+};
