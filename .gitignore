@@ -1,1 +1,21 @@
+# macOS files
 .DS_Store
+
+# Arduino build files
+*.elf
+*.bin
+*.hex
+*.eep
+*.map
+
+# Arduino IDE backup files
+*.ino.~*
+*.cpp.~*
+*.h.~*
+
+# Compiled object files
+*.o
+*.d
+
+# Logs and temporary files
+*.log
