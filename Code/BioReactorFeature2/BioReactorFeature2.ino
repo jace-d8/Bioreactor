@@ -40,8 +40,8 @@ void setup()
   initLcd();
   // lcd.setCursor(COL_LEFT, ROW_1); forgot what this does 
   initSD();
-
   // lcd.setCursor(COL_LEFT, ROW_2); Idk why this was here
+
   configTime(UTC_OFFSET, 0, ""); // This should be either computer time or last counted time, whichever is "higher"
   setTimeFromBuild(); // This too 
 }
@@ -61,6 +61,7 @@ void loop() // minimize delay() and cut down on non modularized logic
 
   phValve.update();
   orpValve.update();
+  
   toggleMenu(config);
 }
 

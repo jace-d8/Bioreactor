@@ -33,12 +33,11 @@ const int SD_CHIP_SELECT = 10;
 
 struct ConfigState 
 {
-  bool valvesDisabled = false;
   String serialInput = "";
   int phValveActivationCount = 0;
+  bool valvesDisabled = false;
   bool lcdCleared = false;
   bool blinkState = true;
-  unsigned long lastBlinkTime = 0;
   float phValue = 0.0f;
   int orpValue = 0;
 };

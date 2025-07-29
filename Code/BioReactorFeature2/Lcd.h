@@ -5,6 +5,7 @@
 #include <LiquidCrystal_I2C.h>
 #include "Config.h"
 
+
 enum LcdPos
 {
   ROW_TITLE = 0,

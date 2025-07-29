@@ -1,6 +1,8 @@
 #include "Lcd.h"
+#include "Timer.h"
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
+Timer blinkTimer(TimingIntervals::BLINK_INTERVAL);
 
 MenuItem menuChoices[] = {
     { COL_LEFT,  ROW_1, "pH 1",  MENU_PH1 },
@@ -54,12 +56,7 @@ void printLcdMenu(ConfigState& config, int selectedItem)
 
 void updateGlobalBlink(ConfigState& config)
 {
-  unsigned long currentMillis = millis();
-  if (currentMillis - config.lastBlinkTime >= TimingIntervals::BLINK_INTERVAL)
-  {
-    config.blinkState = !config.blinkState;
-    config.lastBlinkTime = currentMillis;
-  }
+  if (blinkTimer.isReady()) config.blinkState = !config.blinkState;
 }
 
 void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex)
