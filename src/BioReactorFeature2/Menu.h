@@ -43,10 +43,20 @@ void isPressed(bool &calibrateMenu, int selectedItem, ConfigState& config, EzoBo
 
 // Menu display
 void printLcdMenu(ConfigState& config, int selectedItem);
-void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex);
+void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex, const ConfigState& config);
 void displayWarning(ConfigState& config);
 
 // Calibration
 void calibrateProbePH(ConfigState& config, EzoBoard& phSensor);
 void calibrateProbeORP(ConfigState& config, EzoBoard& orpSensor);
+
+// PH Calibration Helpers
+void handlePHCalibrationSelection(int bufferSelection, bool bufferCalibrated[3], EzoBoard& phSensor, bool& selecting);
+void displayPHMenu(bool bufferCalibrated[3], int bufferSelection, const ConfigState& config);
+bool allPHBuffersCalibrated(bool bufferCalibrated[3]);
+
+// ORP Calibration Helpers
+void handleORPSelection(int selectedItem, bool& selecting, EzoBoard& orpSensor);
+void displayORPCalibrationMenu(int selectedItem, const ConfigState& config);
+
 

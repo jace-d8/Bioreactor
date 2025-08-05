@@ -3,6 +3,8 @@
 #include "Config.h"
 #include "EzoBoard.h"
 
+extern ConfigState config; // temp solution
+
 MenuItem menuChoices[] = {
     { COL_LEFT,  ROW_1, "pH 1",  MENU_PH1 },
     { COL_LEFT,  ROW_2, "pH 2",  MENU_PH2 },
@@ -85,28 +87,23 @@ void toggleMenu(ConfigState& config, EzoBoard& phSensor, EzoBoard& orpSensor)
 
 void printLcdMenu(ConfigState& config, int selectedItem)
 {
-  lcd.setCursor(COL_LEFT, ROW_TITLE);
-  lcd.print("Calibrate Probe:");
+    lcd.setCursor(COL_LEFT, ROW_TITLE);
+    lcd.print("Calibrate Probe:");
 
-  printMenuItem(COL_LEFT,  ROW_1, "pH 1",  MENU_PH1, selectedItem);
-  printMenuItem(COL_LEFT,  ROW_2, "pH 2",  MENU_PH2, selectedItem);
-  printMenuItem(COL_LEFT,  ROW_3, "pH 3",  MENU_PH3, selectedItem);
-  printMenuItem(COL_MID,   ROW_1, "ORP 1", MENU_ORP1, selectedItem);
-  printMenuItem(COL_MID,   ROW_2, "ORP 2", MENU_ORP2, selectedItem);
-  printMenuItem(COL_MID,   ROW_3, "ORP 3", MENU_ORP3, selectedItem);
-
-  if (config.valvesDisabled)
-    printMenuItem(COL_FAR_RIGHT, ROW_1, "Vl ON", MENU_VALVE_TOGGLE, selectedItem);
-  else
-    printMenuItem(COL_FAR_RIGHT, ROW_1, "Vl OFF", MENU_VALVE_TOGGLE, selectedItem);
-
-  printMenuItem(COL_FAR_RIGHT, ROW_2, "Done", MENU_DONE, selectedItem);
+    printMenuItem(COL_LEFT,  ROW_1, "pH 1",  MENU_PH1, selectedItem, config);
+    printMenuItem(COL_LEFT,  ROW_2, "pH 2",  MENU_PH2, selectedItem, config);
+    printMenuItem(COL_LEFT,  ROW_3, "pH 3",  MENU_PH3, selectedItem, config);
+    printMenuItem(COL_MID,   ROW_1, "ORP 1", MENU_ORP1, selectedItem, config);
+    printMenuItem(COL_MID,   ROW_2, "ORP 2", MENU_ORP2, selectedItem, config);
+    printMenuItem(COL_MID,   ROW_3, "ORP 3", MENU_ORP3, selectedItem, config);
+    printMenuItem(COL_FAR_RIGHT, ROW_1, config.valvesDisabled ? "Vl ON" : "Vl OFF", MENU_VALVE_TOGGLE, selectedItem, config);
+    printMenuItem(COL_FAR_RIGHT, ROW_2, "Done", MENU_DONE, selectedItem, config);
 }
 
-void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex) // update this
+void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex, const ConfigState& config)
 {
   lcd.setCursor(col, row);
-  if (itemIndex == selectedIndex)
+  if (itemIndex == selectedIndex && config.blinkState)
     lcd.print("      ");
   else
     lcd.print(label);
@@ -119,28 +116,27 @@ void displayWarning(ConfigState& config)
   lcd.print("WARNING:");
   lcd.setCursor(COL_LEFT, ROW_1);
   lcd.print("pH buffer not reacting");
-  printMenuItem(COL_LEFT, ROW_2, "Unlock System?", MENU_PH1, MENU_PH1);
+  printMenuItem(COL_LEFT, ROW_2, "Unlock System?", MENU_PH1, MENU_PH1, config);
 }
 
 // -------------------- PH CALIBRATION HELPERS --------------------
 void displayPHMenu(bool bufferCalibrated[3], int bufferSelection)
 {
-    analogControl(bufferSelection);
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Select Buffer:");
 
-    printMenuItem(COL_LEFT,  ROW_1, "pH 4",   BUFFER_4,   bufferSelection);
-    printMenuItem(COL_LEFT,  ROW_2, "pH 7",   BUFFER_7,   bufferSelection);
-    printMenuItem(COL_LEFT,  ROW_3, "pH 10",  BUFFER_10,  bufferSelection);
-    printMenuItem(COL_RIGHT, ROW_1, "Clear",  BUFFER_CLEAR, bufferSelection);
-    printMenuItem(COL_RIGHT, ROW_2, "Done",   BUFFER_DONE,  bufferSelection);
+    printMenuItem(COL_LEFT,  ROW_1, "pH 4",   BUFFER_4,   bufferSelection, config);
+    printMenuItem(COL_LEFT,  ROW_2, "pH 7",   BUFFER_7,   bufferSelection, config);
+    printMenuItem(COL_LEFT,  ROW_3, "pH 10",  BUFFER_10,  bufferSelection, config);
+    printMenuItem(COL_RIGHT, ROW_1, "Clear",  BUFFER_CLEAR, bufferSelection, config);
+    printMenuItem(COL_RIGHT, ROW_2, "Done",   BUFFER_DONE,  bufferSelection, config);
 
     if (bufferCalibrated[0]) lcd.setCursor(COL_MID, ROW_1), lcd.print("*");
     if (bufferCalibrated[1]) lcd.setCursor(COL_MID, ROW_2), lcd.print("*");
     if (bufferCalibrated[2]) lcd.setCursor(COL_MID, ROW_3), lcd.print("*");
 }
 
-void handlePHCalibrationSelection(int bufferSelection, bool bufferCalibrated[3], EzoBoard& phSensor)
+void handlePHCalibrationSelection(int bufferSelection, bool bufferCalibrated[3], EzoBoard& phSensor, bool& selecting)
 {
     switch (bufferSelection)
     {
@@ -153,6 +149,10 @@ void handlePHCalibrationSelection(int bufferSelection, bool bufferCalibrated[3],
             lcd.clear();
             lcd.print("Calibration Cleared");
             delay(1500);
+            lcd.clear();
+            break;
+        case 4: 
+            selecting = false;
             lcd.clear();
             break;
     }
@@ -172,13 +172,14 @@ void calibrateProbePH(ConfigState& config, EzoBoard& phSensor)
 
     while (selecting)
     {
+        analogControl(bufferSelection);
         displayPHMenu(bufferCalibrated, bufferSelection);
         updateGlobalBlink(config);
 
         if (!digitalRead(PinConfigurations::PIN_SW))
         {
             while (!digitalRead(PinConfigurations::PIN_SW));
-            handlePHCalibrationSelection(bufferSelection, bufferCalibrated, phSensor);
+            handlePHCalibrationSelection(bufferSelection, bufferCalibrated, phSensor, selecting);
         }
 
         if (allPHBuffersCalibrated(bufferCalibrated))
@@ -219,8 +220,8 @@ void displayORPCalibrationMenu(int selectedItem)
 {
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Calibrate when ready");
-    printMenuItem(COL_LEFT, ROW_1, "Cal", 0, selectedItem);
-    printMenuItem(COL_LEFT, ROW_2, "Done", 1, selectedItem);
+    printMenuItem(COL_LEFT, ROW_1, "Cal", 0, selectedItem, config);
+    printMenuItem(COL_LEFT, ROW_2, "Done", 1, selectedItem, config);
 }
 
 void calibrateProbeORP(ConfigState& config, EzoBoard& orpSensor)
@@ -231,6 +232,7 @@ void calibrateProbeORP(ConfigState& config, EzoBoard& orpSensor)
 
     while (selecting)
     {
+        analogControl(selectedItem);
         updateGlobalBlink(config);
         displayORPCalibrationMenu(selectedItem);
 

@@ -29,7 +29,7 @@ Timer valveCooldownTimer(TimingIntervals::VALVE_COOLDOWN);
 ConfigState config;
 // Consider only passing needed vars to functions instead of full struct 
 
-// Features: time thing, debounce function, non blocking messages 
+// Features: time thing, debounce function, non blocking messages for menu switches, throw lcd error class
 
 void setup()
 {
