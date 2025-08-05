@@ -11,12 +11,12 @@
 EzoBoard orpSensor(98, "ORP");
 EzoBoard phSensor(99, "PH");
 
-// Valves
 Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000); // Open for 10 seconds
 Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000); // Open for 4 seconds 
 // Recall the open time is counted as cooldown waiting period
 
-// Timers
+SdLogger sd;
+
 Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
 Timer orpFlushTimer(TimingIntervals::HOUR_INTERVAL);
@@ -24,12 +24,16 @@ Timer phCountResetTimer(TimingIntervals::PH_RESET_WINDOW);
 Timer orpCountResetTimer(TimingIntervals::ORP_RESET_WINDOW);
 Timer valveCooldownTimer(TimingIntervals::VALVE_COOLDOWN);
 
-
-// Single runtime config
 ConfigState config;
-// Consider only passing needed vars to functions instead of full struct 
 
-// Features: time thing, debounce function, non blocking messages for menu switches, throw lcd error class
+Menu menu(&config, &phSensor, &orpSensor);
+
+// Consider only passing needed vars to functions instead of full struct 
+// Features: time thing, debounce function, non blocking messages for menu switches, throw lcd error class, add lcd class
+
+// DO FSM FOR LCD AND MENU NEXT THEN DEBOUNCE FUNCTION THEN WORK ON SHOW MESSAGE CLASS THEN SD (INCLUDE TIME VAR FOR BETTER TRACKING)
+// NEXT ADD SENSOR LOGIC
+// THEN TACKLE WIFI
 
 void setup()
 {
@@ -42,30 +46,21 @@ void setup()
   pinMode(PinConfigurations::PIN_SW, INPUT_PULLUP);
 
   initLcd();
-  // lcd.setCursor(COL_LEFT, ROW_1); forgot what this does 
-  initSD();
-  // lcd.setCursor(COL_LEFT, ROW_2); Idk why this was here
-
-  configTime(UTC_OFFSET, 0, ""); // This should be either computer time or last counted time, whichever is "higher"
-  setTimeFromBuild(); // This too 
+  configTime(UTC_OFFSET, 0, ""); // esp32 function
+  sd.setTimeFromBuild(); 
 }
 
 void loop() // minimize delay() and cut down on non modularized logic
 { 
-  // Periodic sensor reads
   if (probeTimer.isReady()) handleProbeReads(config);
-  // Periodic SD logging
-  if (sdLogTimer.isReady()) logToSD(config);
-  // PH Valve Control
+  if (sdLogTimer.isReady()) sd.log(config);
   if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimer.isReady()) handlePhValve(); 
-  // ORP Valve Control
-  if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady()) orpValve.open();
-  // Hourly ORP flush
+  if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady()) handleOrpValve();
   if (orpFlushTimer.isReady()) orpValve.open();
 
   phValve.update();
   orpValve.update();
-  toggleMenu(config, phSensor, orpSensor); // consider some demodularization so you dont have to hold sw
+  if (!digitalRead(PinConfigurations::PIN_SW)) menu.toggle();  
 }
 
 
@@ -100,7 +95,7 @@ void handlePhValve()
 
   if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS)
   {
-    displayWarning(config);
+    menu.displayWarning();
     config.phValveActivationCount = 0;
   }
 }
@@ -119,7 +114,7 @@ void handleOrpValve()
 
   if (config.orpValveActivationCount >= TimingIntervals::ORP_VALVE_MAX_ACTIVATIONS)
   {
-    displayWarning(config);
+    menu.displayWarning();
     config.orpValveActivationCount = 0;
   }
 }

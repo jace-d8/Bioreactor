@@ -1,19 +1,14 @@
-class Timer {
-  unsigned long lastTrigger;
-  unsigned long interval;
+#pragma once
+#include <Arduino.h>
+
+class Timer 
+{
+private:
+  unsigned long lastTrigger_;
+  unsigned long interval_;
+
 public:
-  Timer(unsigned long interval) : lastTrigger(0), interval(interval) {}
-
-  bool isReady() 
-  {
-    unsigned long current = millis();
-    if (current - lastTrigger >= interval) 
-    {
-      lastTrigger = current;
-      return true;
-    }
-    return false;
-  }
-
-  void reset() { lastTrigger = millis(); }
+  Timer(unsigned long interval);
+  bool isReady();
+  void reset();
 };

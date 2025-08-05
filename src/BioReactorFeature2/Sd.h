@@ -5,6 +5,13 @@
 
 #define UTC_OFFSET (-7 * 3600)
 
-void initSD(); 
-void setTimeFromBuild();
-void logToSD(ConfigState& config, String message = "");
+class SdLogger 
+{
+public:
+    SdLogger();
+    void setTimeFromBuild();
+    void log(ConfigState& config, const String& message = "");
+
+private:
+    File dataFile_;
+};

@@ -19,15 +19,16 @@ namespace Thresholds
 
 namespace TimingIntervals // Counted in milliseconds; anything larger than 32,767 MUST be followed by UL
 {
-  const unsigned long PROBE_READ_INTERVAL = 2000UL;
-  const unsigned long SD_LOG_INTERVAL = 120000UL;
-  const unsigned long HOUR_INTERVAL = 3600000UL;
-  const unsigned long VALVE_COOLDOWN = 60000UL;
+  const unsigned long PROBE_READ_INTERVAL = 2000UL; 
+  const unsigned long SD_LOG_INTERVAL = 2 * 60 * 1000UL; // 2 minutes * 60 seconds/minute * 1000 milliseconds/second
+  const unsigned long HOUR_INTERVAL = 60 * 60 * 1000UL; 
+  const unsigned long VALVE_COOLDOWN = 1 * 60 * 1000UL;
   const int PH_VALVE_MAX_ACTIVATIONS = 3; 
   const int ORP_VALVE_MAX_ACTIVATIONS = 4; 
-  const unsigned long PH_RESET_WINDOW = 4 * 60 * 1000UL; // 4 min
-  const unsigned long ORP_RESET_WINDOW = 4 * 60 * 1000UL; // 4 min
+  const unsigned long PH_RESET_WINDOW = 4 * 60 * 1000UL; 
+  const unsigned long ORP_RESET_WINDOW = 4 * 60 * 1000UL; 
   const unsigned long BLINK_INTERVAL = 300UL;
+  const unsigned long EZO_READ_INTERVAL = 900UL;
 }
 
 // SD

@@ -2,7 +2,6 @@
 #include <LiquidCrystal_I2C.h>
 #include "Config.h"
 
-
 enum LcdPos
 {
   ROW_TITLE = 0,
@@ -15,16 +14,14 @@ enum LcdPos
   COL_FAR_RIGHT = 13
 };
 
-extern LiquidCrystal_I2C lcd;
+// turn into a class with fsm
+
+extern LiquidCrystal_I2C lcd; // fix later
 
 void initLcd();
 void updateGlobalBlink(ConfigState& config);
 void printData(ConfigState& config);
 
-// tmp 
-void showMessage(const String& message, unsigned long durationMs = 1000, bool clearAfter = true);
-void updateShowMessage();
-// tmp
 
 
 
