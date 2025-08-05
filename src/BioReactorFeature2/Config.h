@@ -4,8 +4,8 @@
 
 namespace PinConfigurations
 {
-  const int PIN_SW = 5;            // D2
-  const int PIN_JOYSTICK_Y = 2;    // A1
+  const int PIN_SW = D2;            // 5
+  const int PIN_JOYSTICK_Y = A1;    // 2
   const int PH_VALVE_PIN = 3;
   const int ORP_VALVE_PIN = 4; 
 }

@@ -7,6 +7,7 @@ void initSD()
 {
   if (SD.begin(SD_CHIP_SELECT))
   {
+    lcd.setCursor(COL_LEFT, ROW_1);
     lcd.print("SD initialized");
   }
   else
@@ -26,6 +27,7 @@ void setTimeFromBuild()
 
     char buf[32];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&t));
+    lcd.setCursor(COL_LEFT, ROW_2);
     lcd.print(buf);
   }
   else

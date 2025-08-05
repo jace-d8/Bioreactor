@@ -10,7 +10,7 @@ void initLcd()
   lcd.init();
   lcd.backlight();
   lcd.setCursor(COL_LEFT, ROW_TITLE);
-  lcd.print("LCD initialized; Reading Probes");
+  lcd.print("LCD initialized");
 }
 
 void updateGlobalBlink(ConfigState& config)
@@ -59,4 +59,5 @@ void updateShowMessage()
         messageState.active = false;
     }
 }
+// tmp
 

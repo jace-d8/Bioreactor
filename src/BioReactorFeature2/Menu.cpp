@@ -25,12 +25,13 @@ void analogControl(int& selectedItem)
 {
     int yVal = analogRead(PinConfigurations::PIN_JOYSTICK_Y);
     const int deadZone = 400;
-    if (yVal < 1980 - deadZone)  // Up
+    const int range = 1980; 
+    if (yVal < range - deadZone)  // Up
     {
         if (selectedItem > 0) selectedItem--;
         delay(200); // Debounce
     }
-    else if (yVal > 1980 + deadZone) // Down
+    else if (yVal > range + deadZone) // Down
     {
         if (selectedItem < MENU_DONE) selectedItem++;
         delay(200); // Debounce
@@ -41,8 +42,7 @@ void isPressed(bool &calibrateMenu, int selectedItem, ConfigState& config, EzoBo
 {
     if (!digitalRead(PinConfigurations::PIN_SW))
     {
-        delay(200);
-        while (!digitalRead(PinConfigurations::PIN_SW));
+        while (!digitalRead(PinConfigurations::PIN_SW)); // wait until released
         switch (selectedItem)
         {
             case MENU_PH1: calibrateProbePH(config, phSensor); break;
@@ -55,20 +55,21 @@ void isPressed(bool &calibrateMenu, int selectedItem, ConfigState& config, EzoBo
                 lcd.clear();
                 break;
             case MENU_DONE:
-                calibrateMenu = false;
                 lcd.clear();
+                calibrateMenu = false;
                 break;
         }
     }
 }
 
+// -------------------- Menu Visuals --------------------
 void toggleMenu(ConfigState& config, EzoBoard& phSensor, EzoBoard& orpSensor)
 {
     bool calibrateMenu = false;
     int selectedItem = -1;
     if (!digitalRead(PinConfigurations::PIN_SW))
     {
-        delay(200);
+        while (!digitalRead(PinConfigurations::PIN_SW));
         calibrateMenu = true;
         selectedItem = 0;
         lcd.clear();
@@ -102,7 +103,7 @@ void printLcdMenu(ConfigState& config, int selectedItem)
   printMenuItem(COL_FAR_RIGHT, ROW_2, "Done", MENU_DONE, selectedItem);
 }
 
-void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex)
+void printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex) // update this
 {
   lcd.setCursor(col, row);
   if (itemIndex == selectedIndex)
@@ -127,6 +128,12 @@ void displayPHMenu(bool bufferCalibrated[3], int bufferSelection)
     analogControl(bufferSelection);
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Select Buffer:");
+
+    printMenuItem(COL_LEFT,  ROW_1, "pH 4",   BUFFER_4,   bufferSelection);
+    printMenuItem(COL_LEFT,  ROW_2, "pH 7",   BUFFER_7,   bufferSelection);
+    printMenuItem(COL_LEFT,  ROW_3, "pH 10",  BUFFER_10,  bufferSelection);
+    printMenuItem(COL_RIGHT, ROW_1, "Clear",  BUFFER_CLEAR, bufferSelection);
+    printMenuItem(COL_RIGHT, ROW_2, "Done",   BUFFER_DONE,  bufferSelection);
 
     if (bufferCalibrated[0]) lcd.setCursor(COL_MID, ROW_1), lcd.print("*");
     if (bufferCalibrated[1]) lcd.setCursor(COL_MID, ROW_2), lcd.print("*");

@@ -25,6 +25,15 @@ enum MenuIndices
   MENU_DONE
 };
 
+enum PhCalibrationIndices
+{
+  BUFFER_4 = 0,
+  BUFFER_7,
+  BUFFER_10,
+  BUFFER_CLEAR,
+  BUFFER_DONE
+};
+
 extern MenuItem menuChoices[];
 extern MenuItem calMenuChoices[];
 

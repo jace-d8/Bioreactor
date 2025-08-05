@@ -29,6 +29,8 @@ Timer valveCooldownTimer(TimingIntervals::VALVE_COOLDOWN);
 ConfigState config;
 // Consider only passing needed vars to functions instead of full struct 
 
+// Features: time thing, debounce function, non blocking messages 
+
 void setup()
 {
   Serial.begin(9600);              // Init serial comms at 9600 baud
@@ -63,8 +65,7 @@ void loop() // minimize delay() and cut down on non modularized logic
 
   phValve.update();
   orpValve.update();
-  
-  toggleMenu(config, phSensor, orpSensor);
+  toggleMenu(config, phSensor, orpSensor); // consider some demodularization so you dont have to hold sw
 }
 
 
@@ -81,7 +82,6 @@ void handleProbeReads(ConfigState& config)
     lcd.clear();
     config.lcdCleared = true;
   }
-
   printData(config);
 }
 
