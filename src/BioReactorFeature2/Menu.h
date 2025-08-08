@@ -32,10 +32,6 @@ enum PhCalibrationIndices
     BUFFER_DONE
 };
 
-// -------------------- Globals --------------------
-// extern const MenuItem menuChoices[];
-// extern const MenuItem calMenuChoices[];
-
 class Menu 
 {
 private:

@@ -18,7 +18,8 @@ void Menu::toggle()
     }
 }
 
-void Menu::analogControl(int& selectedItem) {
+void Menu::analogControl(int& selectedItem)
+{
     int yVal = analogRead(PinConfigurations::PIN_JOYSTICK_Y);
     const int deadZone = 400;
     const int range = 1980;
@@ -31,8 +32,10 @@ void Menu::analogControl(int& selectedItem) {
     }
 }
 
-void Menu::isPressed(bool& menuActive) {
-    if (!digitalRead(PinConfigurations::PIN_SW)) {
+void Menu::isPressed(bool& menuActive) 
+{
+    if (!digitalRead(PinConfigurations::PIN_SW)) 
+    {
         while (!digitalRead(PinConfigurations::PIN_SW));
         switch (selectedItem_) {
             case MENU_PH1: calibrateProbePH(); break;
@@ -52,19 +55,23 @@ void Menu::isPressed(bool& menuActive) {
     }
 }
 
-void Menu::printLcdMenu(int selectedItem) {
+void Menu::printLcdMenu(int selectedItem) 
+{
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Calibrate Probe:");
-    for (const auto& item : menuChoices_) {
+    for (const auto& item : menuChoices_) 
+    {
         printMenuItem(item.col, item.row, item.label, item.index, selectedItem);
     }
     printMenuItem(COL_FAR_RIGHT, ROW_1, config_->valvesDisabled ? "Vl ON" : "Vl OFF", MENU_VALVE_TOGGLE, selectedItem);
     printMenuItem(COL_FAR_RIGHT, ROW_2, "Done", MENU_DONE, selectedItem);
 }
 
-void Menu::printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex, int blinkSize) {
+void Menu::printMenuItem(int col, int row, const char* label, int itemIndex, int selectedIndex, int blinkSize) 
+{
     lcd.setCursor(col, row);
-    if (itemIndex == selectedIndex && config_->blinkState) {
+    if (itemIndex == selectedIndex && config_->blinkState) 
+    {
         for (int i = 0; i < blinkSize; ++i)
             lcd.print(' ');
     } else {
@@ -72,7 +79,8 @@ void Menu::printMenuItem(int col, int row, const char* label, int itemIndex, int
     }
 }
 
-void Menu::displayWarning() {
+void Menu::displayWarning()
+{
     updateGlobalBlink(*config_);
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("WARNING:");
@@ -81,7 +89,8 @@ void Menu::displayWarning() {
     printMenuItem(COL_LEFT, ROW_2, "Unlock System?", MENU_PH1, MENU_PH1);
 }
 
-void Menu::displayPHMenu() {
+void Menu::displayPHMenu() 
+{
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Select Buffer:");
 
@@ -96,7 +105,8 @@ void Menu::displayPHMenu() {
     if (bufferCalibrated_[2]) lcd.setCursor(COL_MID, ROW_3), lcd.print("*");
 }
 
-void Menu::handlePHCalibrationSelection(int bufferSelection, bool& selecting) {
+void Menu::handlePHCalibrationSelection(int bufferSelection, bool& selecting) 
+{
     switch (bufferSelection) {
         case BUFFER_4:  phSensor_->sendCmd("Cal,low,4.00");  bufferCalibrated_[0] = true; break;
         case BUFFER_7:  phSensor_->sendCmd("Cal,mid,7.00");  bufferCalibrated_[1] = true; break;
@@ -116,21 +126,25 @@ void Menu::handlePHCalibrationSelection(int bufferSelection, bool& selecting) {
     }
 }
 
-bool Menu::allPHBuffersCalibrated() {
+bool Menu::allPHBuffersCalibrated() 
+{
     return bufferCalibrated_[0] && bufferCalibrated_[1] && bufferCalibrated_[2];
 }
 
-void Menu::calibrateProbePH() {
+void Menu::calibrateProbePH()
+{
     phBufferSelection_ = 0;
     bool selecting = true;
     lcd.clear();
 
-    while (selecting) {
+    while (selecting) 
+    {
         analogControl(phBufferSelection_);
         displayPHMenu();
         updateGlobalBlink(*config_);
 
-        if (!digitalRead(PinConfigurations::PIN_SW)) {
+        if (!digitalRead(PinConfigurations::PIN_SW)) 
+        {
             while (!digitalRead(PinConfigurations::PIN_SW));
             handlePHCalibrationSelection(phBufferSelection_, selecting);
         }
@@ -145,15 +159,18 @@ void Menu::calibrateProbePH() {
     }
 }
 
-void Menu::displayORPCalibrationMenu(int selectedItem) {
+void Menu::displayORPCalibrationMenu(int selectedItem) 
+{
     lcd.setCursor(COL_LEFT, ROW_TITLE);
     lcd.print("Calibrate when ready");
     printMenuItem(COL_LEFT, ROW_1, "Cal", 0, selectedItem);
     printMenuItem(COL_LEFT, ROW_2, "Done", 1, selectedItem);
 }
 
-void Menu::handleORPSelection(int selectedItem, bool& selecting) {
-    switch (selectedItem) {
+void Menu::handleORPSelection(int selectedItem, bool& selecting)
+{
+    switch (selectedItem) 
+    {
         case 0:
             orpSensor_->sendCmd("Cal,222");
             lcd.clear();
@@ -172,17 +189,20 @@ void Menu::handleORPSelection(int selectedItem, bool& selecting) {
     }
 }
 
-void Menu::calibrateProbeORP() {
+void Menu::calibrateProbeORP() 
+{
     int selectedItem = 0;
     bool selecting = true;
     lcd.clear();
 
-    while (selecting) {
+    while (selecting) 
+    {
         analogControl(selectedItem);
         updateGlobalBlink(*config_);
         displayORPCalibrationMenu(selectedItem);
 
-        if (!digitalRead(PinConfigurations::PIN_SW)) {
+        if (!digitalRead(PinConfigurations::PIN_SW)) 
+        {
             delay(200);
             while (!digitalRead(PinConfigurations::PIN_SW));
             handleORPSelection(selectedItem, selecting);

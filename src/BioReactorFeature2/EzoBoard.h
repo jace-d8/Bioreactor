@@ -11,7 +11,7 @@ private:
   char response_[32];
 
 public:
-  enum class State { Reading, Waiting, Receiving } state_ = State::Reading;
+  enum class ProbeState { Reading, Waiting, Receiving } state_ = ProbeState::Reading;
 
   EzoBoard(int a, String s);
   float read();

@@ -13,23 +13,23 @@ float EzoBoard::read()
 {
   switch (state_)
   {
-    case State::Reading:   
+    case ProbeState::Reading:   
       ezo_.send_cmd("R");
       ezoTimer.reset();
-      state_ = State::Waiting;
+      state_ = ProbeState::Waiting;
       return lastValue_;
 
-    case State::Waiting:
+    case ProbeState::Waiting:
       if(ezoTimer.isReady())
       {
-        state_ = State::Receiving;
+        state_ = ProbeState::Receiving;
       }
       return lastValue_;
 
-    case State::Receiving:
+    case ProbeState::Receiving:
       ezo_.receive_cmd(response_, sizeof(response_));
       lastValue_= atof(response_); // or set "probe value" to this 
-      state_ = State::Reading;
+      state_ = ProbeState::Reading;
       return lastValue_;
   }
 }
