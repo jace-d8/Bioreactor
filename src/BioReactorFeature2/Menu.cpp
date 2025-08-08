@@ -16,7 +16,6 @@ void Menu::toggle()
         printLcdMenu(selectedItem_);
         isPressed(active_);
     }
-    
 }
 
 void Menu::analogControl(int& selectedItem) {

@@ -29,7 +29,7 @@ ConfigState config;
 Menu menu(&config, &phSensor, &orpSensor);
 
 // Consider only passing needed vars to functions instead of full struct 
-// Features: time thing, debounce function, non blocking messages for menu switches, throw lcd error class, add lcd class
+// Features: time thing, debounce function, non blocking messages for menu switches, throw lcd error class, add lcd class, move ph and orp value to ezo class
 
 // DO FSM FOR LCD AND MENU NEXT THEN DEBOUNCE FUNCTION THEN WORK ON SHOW MESSAGE CLASS THEN SD (INCLUDE TIME VAR FOR BETTER TRACKING)
 // NEXT ADD SENSOR LOGIC
