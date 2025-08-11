@@ -9,6 +9,7 @@ private:
   float lastValue_; 
   String probeType_;
   char response_[32];
+  
 
 public:
   enum class ProbeState { Reading, Waiting, Receiving } state_ = ProbeState::Reading;

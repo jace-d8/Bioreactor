@@ -47,6 +47,8 @@ private:
     bool calibratingPH_ = false;
     bool calibratingORP_ = false;
 
+    enum class MenuState { Idle, Calibrating, Off } state_ MenuState::Off;
+
     const MenuItem menuChoices_[6] = 
     {
         { COL_LEFT,  ROW_1, "pH 1",  MENU_PH1 },

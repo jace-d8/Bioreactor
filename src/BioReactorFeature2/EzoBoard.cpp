@@ -3,8 +3,7 @@
 #include "Config.h"
 #include <Arduino.h>
 
-Timer ezoTimer(TimingIntervals::EZO_READ_INTERVAL);
-
+Timer ezoTimer(TimingIntervals::EZO_READ_INTERVAL); // maybe move to class 
 
 EzoBoard::EzoBoard(int a, String s)
   : ezo_(a, s.c_str()), address_(a), probeType_(s) {}

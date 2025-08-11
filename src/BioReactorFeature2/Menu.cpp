@@ -16,6 +16,16 @@ void Menu::toggle()
         printLcdMenu(selectedItem_);
         isPressed(active_);
     }
+
+    switch (state_)
+    {
+        case MenuState::Idle:
+            // do stuff
+        case MenuState::Calibrating:
+            // do stuff
+        case MenuState::Off:
+            // leace
+    }
 }
 
 void Menu::analogControl(int& selectedItem)
