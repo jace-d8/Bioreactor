@@ -1,23 +1,31 @@
 #include <Wire.h>
+#include <SPI.h>
 #include "Config.h"
 #include "Valve.h"
 #include "EzoBoard.h"
-#include "SPI.h"
 #include "Lcd.h"
 #include "Sd.h"
 #include "Timer.h"
 #include "Menu.h"
 
-// Probes
+// ----- Time config -----
+#define UTC_OFFSET (-7 * 3600)   // adjust if needed
+
+// ----- Probes -----
 EzoBoard orpSensor(98, "ORP");
 EzoBoard phSensor(99, "PH");
 
-Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000); // Open for 10 seconds
-Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000); // Open for 4 seconds 
+// ----- Valves -----
+Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000);   // Open for 10 seconds
+Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000);  // Open for 4 seconds
 
-Lcd lcd; 
-SdLogger* sd = nullptr;            
+// ----- UI -----
+Lcd lcd;
 
+// ----- SD Logger -----
+SdLogger sd;   
+
+// ----- Timers -----
 Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
 Timer orpFlushTimer(TimingIntervals::HOUR_INTERVAL);
@@ -25,87 +33,117 @@ Timer phCountResetTimer(TimingIntervals::PH_RESET_WINDOW);
 Timer orpCountResetTimer(TimingIntervals::ORP_RESET_WINDOW);
 Timer valveCooldownTimer(TimingIntervals::VALVE_COOLDOWN);
 
+// ----- Config state & Menu -----
 ConfigState config;
+Menu menu(&config, &phSensor, &orpSensor, lcd);
 
-Menu menu(&config, &phSensor, &orpSensor, lcd); // Pass LCD reference to menu
+// ----- Forward decls -----
+void handleProbeReads(ConfigState& config);
+void handlePhValve();
+void handleOrpValve();
 
 void setup()
 {
-    Serial.begin(9600);
-    Wire.begin();
-    Wire.setClock(400000);
+  // Serial optional:
+  // Serial.begin(115200);
 
-    pinMode(PinConfigurations::PH_VALVE_PIN, OUTPUT);
-    pinMode(PinConfigurations::ORP_VALVE_PIN, OUTPUT);
+  // I2C
+  Wire.begin();
+  Wire.setClock(400000);
 
-    lcd.init();                  // Initialize LCD via class
-    SPI.begin();                                
-    configTime(UTC_OFFSET, 0, "");               
-    sd = new SdLogger(lcd);       // fix constructor later               
-    sd->setTimeFromBuild();                     
-    sd->log(config, "BOOT");     
-         
+  // IO
+  pinMode(PinConfigurations::PH_VALVE_PIN, OUTPUT);
+  pinMode(PinConfigurations::ORP_VALVE_PIN, OUTPUT);
+
+  // LCD
+  lcd.init();
+
+  // SPI must come BEFORE SD.begin()
+  SPI.begin();
+
+  // Set system time base (no NTP host)
+  configTime(UTC_OFFSET, 0, "");
+
+  // --- SD init: explicit CS pin ---
+  // use a conservative SPI freq for stability; can raise later.
+  sd.begin(/*csPin=*/10, /*spiHz=*/1000000);
+
+  // Build-time RTC seed
+  sd.setTimeFromBuild();
+
+  // First log line
+  sd.log(config, "BOOT");
 }
 
 void loop()
-{ 
-    if (probeTimer.isReady()) handleProbeReads(config);
-    if (sdLogTimer.isReady()) sd->log(config);
-    if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimer.isReady()) handlePhValve(); 
-    if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady()) handleOrpValve();
-    if (orpFlushTimer.isReady()) orpValve.open();
+{
+  if (probeTimer.isReady())
+    handleProbeReads(config);
 
-    if (!menu.isActive() && menu.joystick.isPressed()) menu.enter();
-    
-    if (menu.isActive()) 
-    {
-        menu.update();
-        menu.draw();
-    }
+  if (sdLogTimer.isReady())
+    sd.log(config);  
 
+  if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimer.isReady())
+    handlePhValve();
+
+  if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady())
+    handleOrpValve();
+
+  if (orpFlushTimer.isReady())
+    orpValve.open();
+
+  if (!menu.isActive() && menu.joystick.isPressed())
+    menu.enter();
+
+  if (menu.isActive()) 
+  {
+    menu.update();
+    menu.draw();
+  }
 }
 
 void handleProbeReads(ConfigState& config)
 {
-    config.phValue = phSensor.read();
-    config.orpValue = orpSensor.read();
+  config.phValue  = phSensor.read();
+  config.orpValue = orpSensor.read();
 
-    if (!config.lcdCleared)
-    {
-        lcd.clear();
-        config.lcdCleared = true;
-    }
-    if (!menu.isActive()) lcd.printData(config); 
+  if (!config.lcdCleared) 
+  {
+    lcd.clear();
+    config.lcdCleared = true;
+  }
+  if (!menu.isActive())
+    lcd.printData(config);
 }
 
 void handlePhValve()
 {
-    phValve.open();
+  phValve.open();
 
-    if (phCountResetTimer.isReady())
-        config.phValveActivationCount = 1;
-    else
-        config.phValveActivationCount++;
+  if (phCountResetTimer.isReady())
+    config.phValveActivationCount = 1;
+  else
+    config.phValveActivationCount++;
 
-    if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS)
-    {
-        menu.displayError("pH buffer not reacting");
-        config.phValveActivationCount = 0;
-    }
+  if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS) 
+  {
+    menu.displayError("pH buffer not reacting");
+    config.phValveActivationCount = 0;
+  }
 }
 
 void handleOrpValve()
 {
-    orpValve.open();
+  orpValve.open();
 
-    if (orpCountResetTimer.isReady())
-        config.orpValveActivationCount = 1;
-    else
-        config.orpValveActivationCount++;
+  if (orpCountResetTimer.isReady())
+    config.orpValveActivationCount = 1;
+  else
+    config.orpValveActivationCount++;
 
-    if (config.orpValveActivationCount >= TimingIntervals::ORP_VALVE_MAX_ACTIVATIONS)
-    {
-        menu.displayError("ORP buffer not reacting");
-        config.orpValveActivationCount = 0;
-    }
+  if (config.orpValveActivationCount >= TimingIntervals::ORP_VALVE_MAX_ACTIVATIONS) 
+  {
+    menu.displayError("ORP buffer not reacting");
+    config.orpValveActivationCount = 0;
+  }
 }

@@ -2,22 +2,25 @@
 #include <SPI.h>
 #include <SD.h>
 #include "Config.h"
-#include "Lcd.h"
 
-#define UTC_OFFSET (-7 * 3600)
 
-class SdLogger 
-{
+class SdLogger {
 public:
-  SdLogger(Lcd& lcdRef, int csPin = SD_CHIP_SELECT);
-  ~SdLogger();
+  SdLogger() = default;
+
+  bool begin(uint8_t csPin, uint32_t spiHz = 1000000);
+
+  void end();
+
+  void log(struct ConfigState& config, const String& message = "");
+
   void setTimeFromBuild();
-  void log(ConfigState& config, const String& message = "");
-  void beginSession();
-  Lcd& lcd;
 
 private:
   File dataFile_;
-  int cs_ = SD_CHIP_SELECT;
   String makeNextFilename_();
+  bool runDiagnostics{false};
+  void diag_(const char* line);
+
+  bool ready_ = false;
 };
