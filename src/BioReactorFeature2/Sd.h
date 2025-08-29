@@ -9,12 +9,15 @@
 class SdLogger 
 {
 public:
-    // Take the LCD reference explicitly; construct after Lcd in the sketch.
-    SdLogger(Lcd& lcdRef);
-    void setTimeFromBuild();
-    void log(ConfigState& config, const String& message = "");
-    Lcd& lcd;  // reference to Lcd instance
+  SdLogger(Lcd& lcdRef, int csPin = SD_CHIP_SELECT);
+  ~SdLogger();
+  void setTimeFromBuild();
+  void log(ConfigState& config, const String& message = "");
+  void beginSession();
+  Lcd& lcd;
 
 private:
-    File dataFile_;
+  File dataFile_;
+  int cs_ = SD_CHIP_SELECT;
+  String makeNextFilename_();
 };

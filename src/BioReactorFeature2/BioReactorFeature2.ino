@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "Valve.h"
 #include "EzoBoard.h"
+#include "SPI.h"
 #include "Lcd.h"
 #include "Sd.h"
 #include "Timer.h"
@@ -15,7 +16,7 @@ Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000); // Open for 10 seconds
 Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000); // Open for 4 seconds 
 
 Lcd lcd; 
-SdLogger sd(lcd);
+SdLogger* sd = nullptr;            
 
 Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
@@ -38,20 +39,21 @@ void setup()
     pinMode(PinConfigurations::ORP_VALVE_PIN, OUTPUT);
 
     lcd.init();                  // Initialize LCD via class
-    configTime(UTC_OFFSET, 0, ""); 
-    sd.setTimeFromBuild(); 
+    SPI.begin();                                
+    configTime(UTC_OFFSET, 0, "");               
+    sd = new SdLogger(lcd);       // fix constructor later               
+    sd->setTimeFromBuild();                     
+    sd->log(config, "BOOT");     
+         
 }
 
 void loop()
 { 
     if (probeTimer.isReady()) handleProbeReads(config);
-    if (sdLogTimer.isReady()) sd.log(config);
+    if (sdLogTimer.isReady()) sd->log(config);
     if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimer.isReady()) handlePhValve(); 
     if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady()) handleOrpValve();
     if (orpFlushTimer.isReady()) orpValve.open();
-
-
-
 
     if (!menu.isActive() && menu.joystick.isPressed()) menu.enter();
     
