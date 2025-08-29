@@ -51,23 +51,16 @@ void loop()
     if (orpFlushTimer.isReady()) orpValve.open();
 
 
-    // think more on this later
-    static bool lastPressed = false;                 // remembers prior state
-    bool pressed = !digitalRead(PinConfigurations::PIN_SW); // active-low
 
-    if (!menu.isActive()) 
-    {
-        if (pressed && !lastPressed)
-        {
-            menu.enter();
-        }
-    }
+
+    if (!menu.isActive() && menu.joystick.isPressed()) menu.enter();
+    
     if (menu.isActive()) 
     {
         menu.update();
         menu.draw();
     }
-    lastPressed = pressed;
+
 }
 
 void handleProbeReads(ConfigState& config)

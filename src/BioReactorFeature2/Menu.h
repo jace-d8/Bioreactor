@@ -1,3 +1,4 @@
+
 #pragma once
 #include "Lcd.h"
 #include "Config.h"
@@ -37,7 +38,7 @@ private:
     EzoBoard* phSensor_;
     EzoBoard* orpSensor_;
     Lcd& lcd;
-    Joystick joystick{PinConfigurations::PIN_Y, PinConfigurations::PIN_SW, MENU_DONE};
+    
 
     // Menu state
     enum class MenuState { Idle, Calibrating, Valves, PhCalibration, OrpCalibration, Off };
@@ -77,6 +78,7 @@ public:
     void draw();
     void displayError(const String& error);
     bool isActive() const { return state_ != MenuState::Off; }
+    Joystick joystick{PinConfigurations::PIN_Y, PinConfigurations::PIN_SW, MENU_DONE}; // move back to private and make getter
 
 private:
     // Flow handlers
