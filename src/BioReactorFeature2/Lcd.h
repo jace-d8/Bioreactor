@@ -1,6 +1,7 @@
 #pragma once
 #include <LiquidCrystal_I2C.h>
 #include "Config.h"
+#include "Timer.h"
 
 enum LcdPos
 {
@@ -14,15 +15,24 @@ enum LcdPos
   COL_FAR_RIGHT = 13
 };
 
-// turn into a class with fsm
+class Lcd
+{
+private:
+    LiquidCrystal_I2C lcd_;
+    Timer blinkTimer_{TimingIntervals::BLINK_INTERVAL};
 
-extern LiquidCrystal_I2C lcd; // fix later
+public:
+    Lcd() : lcd_(0x27, 20, 4) {}
 
-void initLcd();
-void updateGlobalBlink(ConfigState& config);
-void printData(ConfigState& config);
+    void init();
+    void clear();
 
+    void print(const char* str);
+    void print(float val, int prec);
+    void print(const String& text);
+    void print(char c);           
+    void setCursor(int col, int row);
 
-
-
-
+    void updateBlink(ConfigState& config);
+    void printData(const ConfigState& config);
+};

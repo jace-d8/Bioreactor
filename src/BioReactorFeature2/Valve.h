@@ -7,7 +7,7 @@ private:
   int pin_;
   bool isOpen_;
   bool enable_;
-  unsigned int startTime_;
+  unsigned long startTime_;
   const unsigned long openDuration_;
 
 public:

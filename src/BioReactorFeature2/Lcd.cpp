@@ -1,36 +1,58 @@
 #include "Lcd.h"
 #include "Timer.h"
 
-
-LiquidCrystal_I2C lcd(0x27, 20, 4);
-Timer blinkTimer(TimingIntervals::BLINK_INTERVAL);
-
-void initLcd()
+void Lcd::init()
 {
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(COL_LEFT, ROW_TITLE);
-  lcd.print("LCD initialized");
+    lcd_.init();
+    lcd_.backlight();
+    lcd_.setCursor(COL_LEFT, ROW_TITLE);
+    lcd_.print("LCD initialized");
 }
 
-void updateGlobalBlink(ConfigState& config)
+void Lcd::updateBlink(ConfigState& config)
 {
-  if (blinkTimer.isReady()) config.blinkState = !config.blinkState;
+    if (blinkTimer_.isReady())
+        config.blinkState = !config.blinkState;
 }
 
-void printData(ConfigState& config)
+void Lcd::clear()
 {
-  lcd.setCursor(COL_LEFT, ROW_TITLE);
-  lcd.print("pH: ");
-  lcd.print(config.phValue, 3);   // To 3 decimal plaxes 
-  lcd.print("     "); // remove 
-  lcd.setCursor(COL_LEFT, ROW_1);
-  lcd.print("ORP: ");
-  lcd.print(config.orpValue, 0);
-  lcd.print(" mV     ");
+    lcd_.clear();
 }
 
+void Lcd::setCursor(int col, int row)
+{
+    lcd_.setCursor(col, row);
+}
 
+void Lcd::print(const char* text)
+{
+    lcd_.print(text);
+}
 
+void Lcd::print(const String& text)
+{
+    lcd_.print(text);
+}
 
+void Lcd::print(char c)
+{
+    lcd_.print(c);
+}
 
+void Lcd::print(float value, int decimals)
+{
+    lcd_.print(value, decimals);
+}
+
+void Lcd::printData(const ConfigState& config)
+{
+    lcd_.setCursor(COL_LEFT, ROW_TITLE);
+    lcd_.print("pH: ");
+    lcd_.print(config.phValue, 3);
+    lcd_.print("     ");
+    lcd_.setCursor(COL_LEFT, ROW_1);
+    lcd_.print("ORP: ");
+    lcd_.print(config.orpValue, 0);
+    lcd_.print(" mV     ");
+}

@@ -1,7 +1,11 @@
 #include "Valve.h"
 
 Valve::Valve(int pin, unsigned long duration)
-  : pin_(pin), openDuration_(duration), isOpen_(false), enable_(true), startTime_(0) {}
+  : pin_(pin), openDuration_(duration), isOpen_(false), enable_(true), startTime_(0) {
+  pinMode(pin_, OUTPUT);
+  digitalWrite(pin_, LOW);
+}
+
 
 void Valve::open()
 {

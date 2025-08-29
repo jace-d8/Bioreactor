@@ -5,7 +5,7 @@
 namespace PinConfigurations
 {
   const int PIN_SW = D2;            // 5
-  const int PIN_JOYSTICK_Y = A1;    // 2
+  const int PIN_Y = A1;    // 2
   const int PH_VALVE_PIN = 3;
   const int ORP_VALVE_PIN = 4; 
 }
@@ -13,7 +13,7 @@ namespace PinConfigurations
 
 namespace Thresholds
 {
-  const int PH_MINIMUM = 6.3;
+  const float PH_MINIMUM = 6.3f;
   const int ORP_MINIMUM = -163;
 }
 
@@ -32,9 +32,9 @@ namespace TimingIntervals // Counted in milliseconds; anything larger than 32,76
 }
 
 // SD
-const int SD_CHIP_SELECT = 10;
+const int SD_CHIP_SELECT = 10; // put in pin config
 
-struct ConfigState 
+struct ConfigState  // this can go completely at some point 
 {
   String serialInput = "";
   int phValveActivationCount = 0;

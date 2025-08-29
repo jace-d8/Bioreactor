@@ -1,20 +1,59 @@
-#include "Timer.h"
+#include "Joystick.h"
 
-Timer::Timer(unsigned long interval)
-  : lastTrigger_(0), interval_(interval) {}
-
-bool Timer::isReady()
+void Joystick::move()
 {
-  unsigned long current = millis();
-  if (current - lastTrigger_ >= interval_)
-  {
-    lastTrigger_ = current;
-    return true;
-  }
-  return false;
+    int yVal = analogRead(pinY_);
+    const int deadZone = 400;
+    const int center = 1980;
+
+    if (yVal < center - deadZone) 
+    { // Up
+        if (selectedItem_ > 0) 
+            selectedItem_--;
+        else 
+            selectedItem_ = maxIndex_; // Wrap to last
+        delay(200); // Prevent rapid scrolling
+    } 
+    else if (yVal > center + deadZone) 
+    { // Down
+        if (selectedItem_ < maxIndex_) 
+            selectedItem_++;
+        else 
+            selectedItem_ = 0; // Wrap to first
+        delay(200);
+    }
 }
 
-void Timer::reset()
+bool Joystick::isPressed()
 {
-  lastTrigger_ = millis();
+    bool pressed = !digitalRead(pinSW_); // Active low
+
+    if (pressed && debounceTimer_.isReady()) 
+    {
+        debounceTimer_.reset(); // Restart debounce timer
+        return true;
+    }
+    return false;
 }
+
+int Joystick::getSelectedItem() const
+{
+    return selectedItem_;
+}
+
+void Joystick::setSelectedItem(int index)
+{
+    if (index >= 0 && index <= maxIndex_)
+        selectedItem_ = index;
+}
+
+int Joystick::getMaxIndex() const
+{
+  return maxIndex_; 
+}
+
+void Joystick::setMaxIndex(int newMaxIndex)
+{
+  maxIndex_ = newMaxIndex;
+}
+

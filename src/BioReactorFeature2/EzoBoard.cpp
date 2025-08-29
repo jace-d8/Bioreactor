@@ -3,7 +3,7 @@
 #include "Config.h"
 #include <Arduino.h>
 
-Timer ezoTimer(TimingIntervals::EZO_READ_INTERVAL); // maybe move to class 
+
 
 EzoBoard::EzoBoard(int a, String s)
   : ezo_(a, s.c_str()), address_(a), probeType_(s) {}
@@ -14,12 +14,12 @@ float EzoBoard::read()
   {
     case ProbeState::Reading:   
       ezo_.send_cmd("R");
-      ezoTimer.reset();
+      readTimer_.reset();
       state_ = ProbeState::Waiting;
       return lastValue_;
 
     case ProbeState::Waiting:
-      if(ezoTimer.isReady())
+      if(readTimer_.isReady())
       {
         state_ = ProbeState::Receiving;
       }
