@@ -14,13 +14,13 @@ namespace PinConfigurations
 namespace Thresholds
 {
   const float PH_MINIMUM = 6.0f; // raised the threshold to prevent valve activation: old ph: 6.3
-  const int ORP_MINIMUM = -163;
+  const int ORP_MINIMUM = -163; // raised the threshold to prevent valve activation: old ph: -163
 }
 
 namespace TimingIntervals // Counted in milliseconds; anything larger than 32,767 MUST be followed by UL
 {
   const unsigned long PROBE_READ_INTERVAL = 2000UL; 
-  const unsigned long SD_LOG_INTERVAL = 5 * 1000UL; // 5 seconds/minute * 1000 milliseconds/second
+  const unsigned long SD_LOG_INTERVAL = 2 * 60 * 1000UL; // 2 * 60 seconds/minute * 1000 milliseconds/second
   const unsigned long HOUR_INTERVAL = 60 * 60 * 1000UL; // 60 minutes * 60 seconds/minute * 1000 milliseconds/second
   const unsigned long VALVE_COOLDOWN = 1 * 60 * 1000UL;
   const int PH_VALVE_MAX_ACTIVATIONS = 3; 
@@ -43,6 +43,5 @@ struct ConfigState  // this can go completely at some point
   bool lcdCleared = false;
   bool blinkState = true;
   float phValue = 0.0f;
-  int orpValue = 0;
-  // bool errorActive = false;   
+  float orpValue = 0; 
 };

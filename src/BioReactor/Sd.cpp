@@ -96,7 +96,7 @@ void SdLogger::log(struct ConfigState& config, const String& message)
 
   if (message.length() == 0) 
   {
-    dataFile_.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%d\n",
+    dataFile_.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%.0f\n",
       ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday,
       ti->tm_hour, ti->tm_min, ti->tm_sec,
       config.phValue, config.orpValue);

@@ -53,6 +53,6 @@ void Lcd::printData(const ConfigState& config)
     lcd_.print("     ");
     lcd_.setCursor(COL_LEFT, ROW_1);
     lcd_.print("ORP: ");
-    lcd_.print(config.orpValue, 0);
+    lcd_.print(config.orpValue);
     lcd_.print(" mV     ");
 }
