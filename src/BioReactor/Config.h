@@ -13,7 +13,7 @@ namespace PinConfigurations
 
 namespace Thresholds
 {
-  const float PH_MINIMUM = 6.3f; 
+  const float PH_MINIMUM =  6.3f; // changed ph min 
   const int ORP_MINIMUM = -163; 
 }
 
