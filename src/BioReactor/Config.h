@@ -13,15 +13,15 @@ namespace PinConfigurations
 
 namespace Thresholds
 {
-  const float PH_MINIMUM = 6.0f; // raised the threshold to prevent valve activation: old ph: 6.3
-  const int ORP_MINIMUM = -163; // raised the threshold to prevent valve activation: old ph: -163
+  const float PH_MINIMUM = 6.3f; 
+  const int ORP_MINIMUM = -163; 
 }
 
 namespace TimingIntervals // Counted in milliseconds; anything larger than 32,767 MUST be followed by UL
 {
-  const unsigned long PROBE_READ_INTERVAL = 2000UL; 
+  const unsigned long PROBE_READ_INTERVAL = 2000UL; // 2 seconds
   const unsigned long SD_LOG_INTERVAL = 2 * 60 * 1000UL; // 2 * 60 seconds/minute * 1000 milliseconds/second
-  const unsigned long HOUR_INTERVAL = 60 * 60 * 1000UL; // 60 minutes * 60 seconds/minute * 1000 milliseconds/second
+  const unsigned long HOUR_INTERVAL = 60 * 60 * 1000UL; // 60 minutes * 60 seconds/minute * 1000 milliseconds/second // no longer needed 
   const unsigned long VALVE_COOLDOWN = 1 * 60 * 1000UL;
   const int PH_VALVE_MAX_ACTIVATIONS = 3; 
   const int ORP_VALVE_MAX_ACTIVATIONS = 4; 

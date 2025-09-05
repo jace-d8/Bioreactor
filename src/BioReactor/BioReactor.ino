@@ -8,7 +8,7 @@
 #include "Timer.h"
 #include "Menu.h"
 
-// TO-DO: Time valve cooldown irl and make sure its 60 seconds (not 50), 
+// TO-DO: Time valve cooldown check irl and make sure its 60 seconds (not 50), 
 
 // ----- Time config -----
 #define UTC_OFFSET (-7 * 3600)   // adjust if needed
@@ -91,8 +91,8 @@ void loop()
   if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady())
     handleOrpValve();
 
-  if (orpFlushTimer.isReady())
-    orpValve.open();
+  // if (orpFlushTimer.isReady())
+  //   orpValve.open();
 
   if (!menu.isActive() && menu.joystick.isPressed())
     menu.enter();
@@ -129,8 +129,8 @@ void handlePhValve()
 
   if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS) 
   {
-    menu.displayError("pH buffer not reacting");
-    config.phValveActivationCount = 0;
+    // menu.displayError("pH buffer not reacting");
+    // config.phValveActivationCount = 0;
   }
 }
 
@@ -145,7 +145,7 @@ void handleOrpValve()
 
   if (config.orpValveActivationCount >= TimingIntervals::ORP_VALVE_MAX_ACTIVATIONS) 
   {
-    menu.displayError("ORP buffer not reacting");
-    config.orpValveActivationCount = 0;
+    // menu.displayError("ORP buffer not reacting");
+    // config.orpValveActivationCount = 0;
   }
 }
