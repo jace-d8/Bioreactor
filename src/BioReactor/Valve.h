@@ -13,6 +13,7 @@ private:
 public:
   Valve(int pin, unsigned long duration);
   void open();
+  void close(); 
   void update();
   bool isOpen();
   void switchValve();

@@ -30,10 +30,10 @@ SdLogger sd;
 // ----- Timers -----
 Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
-Timer orpFlushTimer(TimingIntervals::HOUR_INTERVAL);
 Timer phCountResetTimer(TimingIntervals::PH_RESET_WINDOW);
 Timer orpCountResetTimer(TimingIntervals::ORP_RESET_WINDOW);
-Timer valveCooldownTimer(TimingIntervals::VALVE_COOLDOWN);
+Timer valveCooldownTimerPh(TimingIntervals::VALVE_COOLDOWN);
+Timer valveCooldownTimerOrp(TimingIntervals::VALVE_COOLDOWN);
 
 // ----- Config state & Menu -----
 ConfigState config;
@@ -56,6 +56,8 @@ void setup()
   // IO
   pinMode(PinConfigurations::PH_VALVE_PIN, OUTPUT);
   pinMode(PinConfigurations::ORP_VALVE_PIN, OUTPUT);
+  digitalWrite(PinConfigurations::PH_VALVE_PIN, LOW); // Ensure they are off initially 
+  digitalWrite(PinConfigurations::ORP_VALVE_PIN, LOW);
 
   // LCD
   lcd.init();
@@ -77,22 +79,21 @@ void setup()
   sd.log(config, "BOOT");
 }
 
-void loop()
+void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started in 4 (below threshold, no trigger), 1 min timer on boot an issue? 
 {
+  phValve.update();
+  orpValve.update();
   if (probeTimer.isReady())
     handleProbeReads(config);
 
   if (sdLogTimer.isReady())
     sd.log(config);  
 
-  if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimer.isReady())
+  if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimerPh.isReady())
     handlePhValve();
 
-  if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimer.isReady())
+  if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimerOrp.isReady())
     handleOrpValve();
-
-  // if (orpFlushTimer.isReady())
-  //   orpValve.open();
 
   if (!menu.isActive() && menu.joystick.isPressed())
     menu.enter();
@@ -118,34 +119,42 @@ void handleProbeReads(ConfigState& config)
     lcd.printData(config);
 }
 
-void handlePhValve()
+void handlePhValve() 
 {
   phValve.open();
+  valveCooldownTimerPh.reset();  
 
   if (phCountResetTimer.isReady())
+  {
     config.phValveActivationCount = 1;
+    phCountResetTimer.reset();  
+  }
   else
     config.phValveActivationCount++;
 
   if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS) 
   {
     // menu.displayError("pH buffer not reacting");
-    // config.phValveActivationCount = 0;
+    config.phValveActivationCount = 0;
   }
 }
 
 void handleOrpValve()
 {
   orpValve.open();
+  valveCooldownTimerOrp.reset();  
 
   if (orpCountResetTimer.isReady())
+  {
     config.orpValveActivationCount = 1;
+    orpCountResetTimer.reset();
+  }
   else
     config.orpValveActivationCount++;
 
   if (config.orpValveActivationCount >= TimingIntervals::ORP_VALVE_MAX_ACTIVATIONS) 
   {
     // menu.displayError("ORP buffer not reacting");
-    // config.orpValveActivationCount = 0;
+    config.orpValveActivationCount = 0;
   }
 }

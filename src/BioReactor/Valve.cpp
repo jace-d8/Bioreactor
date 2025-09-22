@@ -6,7 +6,6 @@ Valve::Valve(int pin, unsigned long duration)
   digitalWrite(pin_, LOW);
 }
 
-
 void Valve::open()
 {
   if (!isOpen_ && enable_)
@@ -14,6 +13,15 @@ void Valve::open()
     digitalWrite(pin_, HIGH);
     startTime_ = millis();
     isOpen_ = true;
+  }
+}
+
+void Valve::close() 
+{
+  if (isOpen_) 
+  {
+    digitalWrite(pin_, LOW);
+    isOpen_ = false;
   }
 }
 
@@ -40,3 +48,6 @@ bool Valve::isEnabled()
 {
   return enable_;
 }
+
+// Consider force close "watchdog" if valve is open for too long
+// 
