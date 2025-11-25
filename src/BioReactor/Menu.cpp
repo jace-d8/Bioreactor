@@ -1,7 +1,17 @@
 #include "Menu.h"
 
-Menu::Menu(ConfigState* config, EzoBoard* phSensor, EzoBoard* orpSensor, Lcd& lcd)
-    : config_(config), phSensor_(phSensor), orpSensor_(orpSensor), lcd(lcd) {}
+
+Menu::Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd)
+    : config_(config), lcd(lcd)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        phSensors_[i]  = &phSensors[i];
+        orpSensors_[i] = &orpSensors[i];
+    }
+    activePh_  = 0;
+    activeOrp_ = 0;
+}
 
 void Menu::enter() 
 {
@@ -17,8 +27,8 @@ void Menu::enter()
 void Menu::update() 
 {
     bool pressed = joystick.isPressed();     
-
     int before = joystick.getSelectedItem();
+
     if (!pressed)
     {                         
         joystick.move();
@@ -130,26 +140,56 @@ void Menu::handleProbesMenu()
 
     switch (joystick.getSelectedItem()) 
     {
+        // ----- pH probes -----
         case MENU_PH1:
-        case MENU_PH2:
-        case MENU_PH3:
+            activePh_ = 0;
             joystick.setSelectedItem(BUFFER_4);
             joystick.setMaxIndex(4);
             state_ = MenuState::PhCalibration;
             break;
 
+        case MENU_PH2:
+            activePh_ = 1;
+            joystick.setSelectedItem(BUFFER_4);
+            joystick.setMaxIndex(4);
+            state_ = MenuState::PhCalibration;
+            break;
+
+        case MENU_PH3:
+            activePh_ = 2;
+            joystick.setSelectedItem(BUFFER_4);
+            joystick.setMaxIndex(4);
+            state_ = MenuState::PhCalibration;
+            break;
+
+        // ----- ORP probes -----
         case MENU_ORP1:
-        case MENU_ORP2:
-        case MENU_ORP3:
+            activeOrp_ = 0;
             joystick.setSelectedItem(0);
             joystick.setMaxIndex(1);
             state_ = MenuState::OrpCalibration;
             break;
 
+        case MENU_ORP2:
+            activeOrp_ = 1;
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(1);
+            state_ = MenuState::OrpCalibration;
+            break;
+
+        case MENU_ORP3:
+            activeOrp_ = 2;
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(1);
+            state_ = MenuState::OrpCalibration;
+            break;
+
+        // ----- done / back -----
         case MENU_DONE:
             joystick.setSelectedItem(0);
             joystick.setMaxIndex(2);
             state_ = MenuState::Idle;
+            lcd.clear();
             break;
     }
     needsFullRedraw_ = true;
@@ -178,20 +218,22 @@ void Menu::handlePhCalibrationSelection()
     switch (joystick.getSelectedItem()) 
     {
         case BUFFER_4:
-            phSensor_->sendCmd("Cal,low,4.00");
-            bufferCalibrated_[0] = true;
+            phSensors_[activePh_]->sendCmd("Cal,low,4.00");
+            bufferCalibrated_[activePh_][0] = true;
             break;
         case BUFFER_7:
-            phSensor_->sendCmd("Cal,mid,7.00");
-            bufferCalibrated_[1] = true;
+            phSensors_[activePh_]->sendCmd("Cal,mid,7.00");
+            bufferCalibrated_[activePh_][1] = true;
             break;
         case BUFFER_10:
-            phSensor_->sendCmd("Cal,high,10.00");
-            bufferCalibrated_[2] = true;
+            phSensors_[activePh_]->sendCmd("Cal,high,10.00");
+            bufferCalibrated_[activePh_][2] = true;
             break;
         case BUFFER_CLEAR:
-            phSensor_->sendCmd("Cal,clear");
-            bufferCalibrated_[0] = bufferCalibrated_[1] = bufferCalibrated_[2] = false;
+            phSensors_[activePh_]->sendCmd("Cal,clear");
+            bufferCalibrated_[activePh_][0] =
+            bufferCalibrated_[activePh_][1] =
+            bufferCalibrated_[activePh_][2] = false;
             break;
         case BUFFER_DONE:
             joystick.setSelectedItem(0);
@@ -207,10 +249,10 @@ void Menu::handleORPSelection()
     switch (joystick.getSelectedItem()) 
     {
         case 0:
-            orpSensor_->sendCmd("Cal,222");
+            orpSensors_[activeOrp_]->sendCmd("Cal,222");
             lcd.setCursor(COL_LEFT, ROW_3);
             lcd.print("Calibrated @222mV   ");
-            delay(350);
+            delay(350); // consider removing
             joystick.setSelectedItem(0);
             joystick.setMaxIndex(MENU_DONE);
             state_ = MenuState::Calibrating;
@@ -223,8 +265,6 @@ void Menu::handleORPSelection()
     }
     needsFullRedraw_ = true;
 }
-
-/* ===== Screens ===== */
 
 void Menu::displayMainMenu() 
 {
@@ -342,9 +382,12 @@ void Menu::displayPhMenu()
             lcd.setCursor(item.col, item.row);
             lcd.print(item.label);
         }
-        if (bufferCalibrated_[0]) { lcd.setCursor(COL_MID, ROW_1); lcd.print("*"); }
-        if (bufferCalibrated_[1]) { lcd.setCursor(COL_MID, ROW_2); lcd.print("*"); }
-        if (bufferCalibrated_[2]) { lcd.setCursor(COL_MID, ROW_3); lcd.print("*"); }
+
+        // Stars for calibrated buffers of the active pH probe
+        if (bufferCalibrated_[activePh_][0]) { lcd.setCursor(COL_MID, ROW_1); lcd.print("*"); }
+        if (bufferCalibrated_[activePh_][1]) { lcd.setCursor(COL_MID, ROW_2); lcd.print("*"); }
+        if (bufferCalibrated_[activePh_][2]) { lcd.setCursor(COL_MID, ROW_3); lcd.print("*"); }
+
         joystick.setMaxIndex(4);
     }
 
@@ -391,7 +434,9 @@ void Menu::displayORPCalibrationMenu()
 
 bool Menu::allPHBuffersCalibrated() 
 {
-    return bufferCalibrated_[0] && bufferCalibrated_[1] && bufferCalibrated_[2];
+    return bufferCalibrated_[activePh_][0] &&
+           bufferCalibrated_[activePh_][1] &&
+           bufferCalibrated_[activePh_][2];
 }
 
 void Menu::displayError(const String& error) 

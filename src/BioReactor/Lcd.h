@@ -1,5 +1,5 @@
 #pragma once
-#include <LiquidCrystal_I2C.h>
+#include <I2C_LCD.h>
 #include "Config.h"
 #include "Timer.h"
 
@@ -18,11 +18,12 @@ enum LcdPos
 class Lcd
 {
 private:
-    LiquidCrystal_I2C lcd_;
+    I2C_LCD lcd_;
     Timer blinkTimer_{TimingIntervals::BLINK_INTERVAL};
 
 public:
-    Lcd() : lcd_(0x27, 20, 4) {}
+    Lcd(uint8_t address = 0x27, TwoWire *bus = &Wire1)
+    : lcd_(address, bus) {}
 
     void init();
     void clear();

@@ -13,16 +13,24 @@
 // ----- Time config -----
 #define UTC_OFFSET (-7 * 3600)   // adjust if needed
 
-// ----- Probes -----
-EzoBoard orpSensor(98, "ORP");
-EzoBoard phSensor(99, "PH");
+EzoBoard orpSensors[3] = { // consider changing hardcoded values later 
+  EzoBoard(98,  "ORP"),
+  EzoBoard(100, "ORP"),
+  EzoBoard(102, "ORP")
+};
+
+EzoBoard phSensors[3] = {
+  EzoBoard(99,  "PH"),
+  EzoBoard(101, "PH"),
+  EzoBoard(103, "PH")
+};
 
 // ----- Valves -----
 Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000);   // Open for 10 seconds
 Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000);  // Open for 4 seconds
 
 // ----- UI -----
-Lcd lcd;
+Lcd lcd(0x27, &Wire1);
 
 // ----- SD Logger -----
 SdLogger sd;   
@@ -37,7 +45,7 @@ Timer valveCooldownTimerOrp(TimingIntervals::VALVE_COOLDOWN);
 
 // ----- Config state & Menu -----
 ConfigState config;
-Menu menu(&config, &phSensor, &orpSensor, lcd);
+Menu menu(&config, phSensors, orpSensors, lcd);
 
 // ----- Forward decls -----
 void handleProbeReads(ConfigState& config);
@@ -47,11 +55,13 @@ void handleOrpValve();
 void setup()
 {
   // Serial optional:
-  // Serial.begin(115200);
+  // Serial.begin(9600);
 
   // I2C
-  Wire.begin();
-  Wire.setClock(400000);
+  Wire.begin(); // SDA = GPIO4, A3, SCL = GPIO11, A4
+  Wire.setClock(100000);
+
+  Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, 100000);   // 100 kHz is fine
 
   // IO
   pinMode(PinConfigurations::PH_VALVE_PIN, OUTPUT);
@@ -69,8 +79,8 @@ void setup()
   configTime(UTC_OFFSET, 0, "");
 
   // --- SD init: explicit CS pin ---
-  // use a conservative SPI freq for stability; can raise later.
-  sd.begin(/*csPin=*/10, /*spiHz=*/1000000);
+  // used a conservative SPI freq for stability; can raise later.
+  sd.begin(PinConfigurations::SD_CHIP_SELECT ,1000000);
 
   // Build-time RTC seed
   sd.setTimeFromBuild();
@@ -81,8 +91,13 @@ void setup()
 
 void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started in 4 (below threshold, no trigger), 1 min timer on boot an issue? 
 {
+  // for (auto& sensor : phSensors) sensor.update();
+  // for (auto& sensor : orpSensors) sensor.update();
   phValve.update();
   orpValve.update();
+
+
+  // this will all need to be updated for 6 probes
   if (probeTimer.isReady())
     handleProbeReads(config);
 
@@ -107,10 +122,13 @@ void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started i
 
 void handleProbeReads(ConfigState& config)
 {
-  config.phValue  = phSensor.read();
-  config.orpValue = orpSensor.read();
+  for (int i = 0; i < 3; ++i) 
+  {
+    config.phValues[i]  = phSensors[i].read();
+    config.orpValues[i] = orpSensors[i].read();
+  }
 
-  if (!config.lcdCleared) 
+  if (!config.lcdCleared) // find cleaner way to do this
   {
     lcd.clear();
     config.lcdCleared = true;

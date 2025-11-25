@@ -50,4 +50,3 @@ bool Valve::isEnabled()
 }
 
 // Consider force close "watchdog" if valve is open for too long
-// 

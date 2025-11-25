@@ -1,4 +1,3 @@
-
 #pragma once
 #include "Lcd.h"
 #include "Config.h"
@@ -35,19 +34,23 @@ class Menu {
 private:
     // Core state / deps
     ConfigState* config_;
-    EzoBoard* phSensor_;
-    EzoBoard* orpSensor_;
+    EzoBoard* phSensors_[3];   
+    EzoBoard* orpSensors_[3]; 
+    int activePh_;            
+    int activeOrp_;         
     Lcd& lcd;
-    
 
     // Menu state
-    enum class MenuState { Idle, Calibrating, Valves, PhCalibration, OrpCalibration, Off };
+    enum class MenuState { Idle, Calibrating, Valves, PhCalibration, OrpCalibration, Error, Off };
     MenuState state_ = MenuState::Off;
 
     // Calibration progress
-    bool bufferCalibrated_[3] = { false, false, false };
+    bool bufferCalibrated_[3][3] = {
+    { false, false, false },   // probe 1
+    { false, false, false },   // probe 2
+    { false, false, false }    // probe 3
+    };
 
-    // UI throttling + dirty tracking (Option 2)
     int lastSelectedItem_ = -1;
     MenuState lastDrawnState_ = MenuState::Off;
     bool needsFullRedraw_ = true;
@@ -72,7 +75,7 @@ private:
     };
 
 public:
-    Menu(ConfigState* config, EzoBoard* phSensor, EzoBoard* orpSensor, Lcd& lcd);
+    Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd);
     void enter();
     void update();
     void draw();

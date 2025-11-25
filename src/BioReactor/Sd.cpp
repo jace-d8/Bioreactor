@@ -32,7 +32,8 @@ bool SdLogger::begin(uint8_t csPin, uint32_t spiHz) // dont want unit vals (yet)
   }
   diag_(("BEGIN: opened " + fname).c_str());
 
-  dataFile_.println("timestamp,pH,ORP");
+  // Updated header for 3 probes
+  dataFile_.println("timestamp,pH1,ORP1,pH2,ORP2,pH3,ORP3");
   dataFile_.flush();
   diag_("BEGIN: wrote header");
   ready_ = true;
@@ -96,14 +97,20 @@ void SdLogger::log(struct ConfigState& config, const String& message)
 
   if (message.length() == 0) 
   {
-    dataFile_.printf("%04d-%02d-%02d %02d:%02d:%02d,%.3f,%.0f\n",
+    // Data row: all three probes
+    dataFile_.printf(
+      "%04d-%02d-%02d %02d:%02d:%02d,%.3f,%.0f,%.3f,%.0f,%.3f,%.0f\n",
       ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday,
       ti->tm_hour, ti->tm_min, ti->tm_sec,
-      config.phValue, config.orpValue);
+      config.phValues[0], config.orpValues[0],
+      config.phValues[1], config.orpValues[1],
+      config.phValues[2], config.orpValues[2]
+    );
     dataFile_.flush();
     diag_("LOG: data row");
   } else 
   {
+    // Message row (BOOT, errors, etc.)
     dataFile_.printf("%04d-%02d-%02d %02d:%02d:%02d,%s\n",
       ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday,
       ti->tm_hour, ti->tm_min, ti->tm_sec,

@@ -3,8 +3,8 @@
 void Joystick::move()
 {
     int yVal = analogRead(pinY_);
-    const int deadZone = 400;
-    const int center = 1980;
+    const int deadZone = 400; 
+    const int center = 1980; 
 
     if (yVal < center - deadZone) 
     { // Up

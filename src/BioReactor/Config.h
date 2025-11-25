@@ -4,10 +4,13 @@
 
 namespace PinConfigurations
 {
-  const int PIN_SW = D2;            // 5
-  const int PIN_Y = A1;    // 2
-  const int PH_VALVE_PIN = 3;
-  const int ORP_VALVE_PIN = 4; 
+  const int PIN_SW = 5;  // D2 or 5
+  const int PIN_Y = 2;  // A1 or 2
+  const int PH_VALVE_PIN = 10; // D7 or 10
+  const int ORP_VALVE_PIN = 17; // D8 or 17
+  const int LCD_PIN_SDA = 6; // D3 or 6
+  const int LCD_PIN_SCL = 7; // D4 or 7
+  const int SD_CHIP_SELECT = 21; // D10 or 21
 }
 
 
@@ -30,17 +33,18 @@ namespace TimingIntervals // Counted in milliseconds; anything larger than 32,76
   const unsigned long EZO_READ_INTERVAL = 900UL;
 }
 
-// SD
-const int SD_CHIP_SELECT = 10; // put in pin config
+
 
 struct ConfigState  // this can go completely at some point 
 {
-  String serialInput = "";
+  // String serialInput = "";
   int phValveActivationCount = 0;
   int orpValveActivationCount = 0;
   bool valvesDisabled = false;
   bool lcdCleared = false;
   bool blinkState = true;
+  float phValues[3] = {0.0f, 0.0f, 0.0f};
+  float orpValues[3] = {0, 0, 0};
   float phValue = 0.0f;
   float orpValue = 0; 
 };

@@ -13,7 +13,7 @@ private:
   Timer readTimer_{900}; // replace with config constant 900U
 public:
   enum class ProbeState { Reading, Waiting, Receiving } state_ = ProbeState::Reading;
-  EzoBoard(int a, String s);
+  EzoBoard(int address, String s);
   float read();
   void sendCmd(String cmd);
 };

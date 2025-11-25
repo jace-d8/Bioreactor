@@ -5,8 +5,8 @@
 
 
 
-EzoBoard::EzoBoard(int a, String s)
-  : ezo_(a, s.c_str()), address_(a), probeType_(s) {}
+EzoBoard::EzoBoard(int address, String s)
+  : ezo_(address, s.c_str()), address_(address), probeType_(s) {}
 
 float EzoBoard::read()
 {
