@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include "Config.h"
-#include "Valve.h"
+#include "Mcp.h"
 #include "EzoBoard.h"
 #include "Lcd.h"
 #include "Sd.h"
@@ -26,8 +26,7 @@ EzoBoard phSensors[3] = {
 };
 
 // ----- Valves -----
-Valve phValve(PinConfigurations::PH_VALVE_PIN, 10000);   // Open for 10 seconds
-Valve orpValve(PinConfigurations::ORP_VALVE_PIN, 4000);  // Open for 4 seconds
+Mcp mcp;
 
 // ----- UI -----
 Lcd lcd(0x27, &Wire1);
@@ -63,11 +62,6 @@ void setup()
 
   Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, 100000);   // 100 kHz is fine
 
-  // IO
-  pinMode(PinConfigurations::PH_VALVE_PIN, OUTPUT);
-  pinMode(PinConfigurations::ORP_VALVE_PIN, OUTPUT);
-  digitalWrite(PinConfigurations::PH_VALVE_PIN, LOW); // Ensure they are off initially 
-  digitalWrite(PinConfigurations::ORP_VALVE_PIN, LOW);
 
   // LCD
   lcd.init();
@@ -91,24 +85,26 @@ void setup()
 
 void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started in 4 (below threshold, no trigger), 1 min timer on boot an issue? 
 {
-  // for (auto& sensor : phSensors) sensor.update();
-  // for (auto& sensor : orpSensors) sensor.update();
-  phValve.update();
-  orpValve.update();
-
-
   // this will all need to be updated for 6 probes
   if (probeTimer.isReady())
     handleProbeReads(config);
 
+
+  // PH
+  if (config.phValues[0] < Thresholds::PH_MINIMUM) mcp.enqueue(1);
+  if (config.phValues[1] < Thresholds::PH_MINIMUM) mcp.enqueue(3);
+  if (config.phValues[2] < Thresholds::PH_MINIMUM) mcp.enqueue(5);
+
+  // ORP
+  if (config.orpValues[0] < Thresholds::ORP_MINIMUM) mcp.enqueue(2);
+  if (config.orpValues[1] < Thresholds::ORP_MINIMUM) mcp.enqueue(4);
+  if (config.orpValues[2] < Thresholds::ORP_MINIMUM) mcp.enqueue(6);
+  
+  mcp.update();
+
+
   if (sdLogTimer.isReady())
     sd.log(config);  
-
-  if ((config.phValue < Thresholds::PH_MINIMUM) && valveCooldownTimerPh.isReady())
-    handlePhValve();
-
-  if ((config.orpValue < Thresholds::ORP_MINIMUM) && valveCooldownTimerOrp.isReady())
-    handleOrpValve();
 
   if (!menu.isActive() && menu.joystick.isPressed())
     menu.enter();
@@ -135,44 +131,4 @@ void handleProbeReads(ConfigState& config)
   }
   if (!menu.isActive())
     lcd.printData(config);
-}
-
-void handlePhValve() 
-{
-  phValve.open();
-  valveCooldownTimerPh.reset();  
-
-  if (phCountResetTimer.isReady())
-  {
-    config.phValveActivationCount = 1;
-    phCountResetTimer.reset();  
-  }
-  else
-    config.phValveActivationCount++;
-
-  if (config.phValveActivationCount >= TimingIntervals::PH_VALVE_MAX_ACTIVATIONS) 
-  {
-    // menu.displayError("pH buffer not reacting");
-    config.phValveActivationCount = 0;
-  }
-}
-
-void handleOrpValve()
-{
-  orpValve.open();
-  valveCooldownTimerOrp.reset();  
-
-  if (orpCountResetTimer.isReady())
-  {
-    config.orpValveActivationCount = 1;
-    orpCountResetTimer.reset();
-  }
-  else
-    config.orpValveActivationCount++;
-
-  if (config.orpValveActivationCount >= TimingIntervals::ORP_VALVE_MAX_ACTIVATIONS) 
-  {
-    // menu.displayError("ORP buffer not reacting");
-    config.orpValveActivationCount = 0;
-  }
 }
