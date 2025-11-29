@@ -13,8 +13,7 @@
 // tmp test
 void Lcd::init()
 {
-    // Give the backpack time to power up
-    delay(1000);  // same as your test sketch; you can try 500ms later
+    delay(1000); 
 
     lcd_.begin(20, 4);
 

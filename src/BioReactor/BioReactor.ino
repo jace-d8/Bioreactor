@@ -62,6 +62,7 @@ void setup()
 
   Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, 100000);   // 100 kHz is fine
 
+  mcp.begin();
 
   // LCD
   lcd.init();

@@ -13,14 +13,19 @@ private:
   bool deactivate_{false};
 
 public: 
-  Mcp() 
+  Mcp() = default;
+  
+  bool begin()               
   {
-    mcp_.begin_I2C();
-    for(int i = 0; i < 6; ++ i)
-    {
+    if (!mcp_.begin_I2C())   // optional: check return
+      return false;
+
+    for (int i = 0; i < 6; ++i)
       mcp_.pinMode(i, OUTPUT);
-    }
+
+    return true;
   }
+
   void enqueue(int activeValveId);  // just push into queue
   void update();   
 };
