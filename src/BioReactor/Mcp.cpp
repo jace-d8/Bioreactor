@@ -1,23 +1,30 @@
 #include "Mcp.h"
 #include "Timer.h"
+#include "Config.h"
 
-Timer queueTimer(12000); // 10 seconds (for now)
-Timer valveTimer(10000);
+Timer queueTimer(TimingIntervals::QUEUE_TIMER); // 12 seconds 
+Timer valveTimer(TimingIntervals::VALVE_TIMER); // 10 seconds
 
 void Mcp::enqueue(int activeValveId)
 {
+  if (valveQueue_.size() >= 6) 
+  {
+    return;
+  }
   if (!deactivate_ && activeValveId > 0 && activeValveId <= 6) 
   {
     valveQueue_.push(activeValveId);
   }
 }
 
-void Mcp::update()
+void Mcp::update(bool queued[])
 {
   if(queueTimer.isReady() && !valveQueue_.empty() && !deactivate_ && !openValve_) 
   {
     currentValve_ = valveQueue_.front(); 
+    queued[currentValve_] = false;
     valveQueue_.pop();
+    
 
     mcp_.digitalWrite(currentValve_ - 1, HIGH);
     openValve_ = true; 
@@ -33,11 +40,6 @@ void Mcp::update()
     currentValve_ = -1;
   }
 }
-
-// push into queue once
-// pop front of queue
-// open valve for n seconds 
-// "shutdown" queue while valve open
 
 
 

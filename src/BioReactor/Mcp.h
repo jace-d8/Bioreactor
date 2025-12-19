@@ -27,5 +27,5 @@ public:
   }
 
   void enqueue(int activeValveId);  // just push into queue
-  void update();   
+  void update(bool queued[]);   
 };

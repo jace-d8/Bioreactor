@@ -31,6 +31,8 @@ namespace TimingIntervals // Counted in milliseconds; anything larger than 32,76
   const unsigned long ORP_RESET_WINDOW = 4 * 60 * 1000UL; 
   const unsigned long BLINK_INTERVAL = 300UL;
   const unsigned long EZO_READ_INTERVAL = 900UL;
+  const unsigned long QUEUE_TIMER = 12000UL;
+  const unsigned long VALVE_TIMER = 10000UL;
 }
 
 

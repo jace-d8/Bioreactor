@@ -6,6 +6,7 @@
 #include "Lcd.h"
 #include "Sd.h"
 #include "Timer.h"
+#include "ActionTimer.h"
 #include "Menu.h"
 
 // TO-DO: Time valve cooldown check irl and make sure its 60 seconds (not 50), 
@@ -42,9 +43,25 @@ Timer orpCountResetTimer(TimingIntervals::ORP_RESET_WINDOW);
 Timer valveCooldownTimerPh(TimingIntervals::VALVE_COOLDOWN);
 Timer valveCooldownTimerOrp(TimingIntervals::VALVE_COOLDOWN);
 
+ActionTimer cooldown[7] = { // test 
+  ActionTimer(0),       // unused index 0
+  ActionTimer(60000),   // 1  PH0
+  ActionTimer(60000),   // 2  ORP0
+  ActionTimer(60000),   // 3  PH1
+  ActionTimer(60000),   // 4  ORP1
+  ActionTimer(60000),   // 5  PH2
+  ActionTimer(60000)    // 6  ORP2
+};
+
+
+
+
 // ----- Config state & Menu -----
 ConfigState config;
 Menu menu(&config, phSensors, orpSensors, lcd);
+
+// ----- Membership Tracker -----
+bool queued[7] = {false};
 
 // ----- Forward decls -----
 void handleProbeReads(ConfigState& config);
@@ -90,18 +107,48 @@ void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started i
   if (probeTimer.isReady())
     handleProbeReads(config);
 
-
   // PH
-  if (config.phValues[0] < Thresholds::PH_MINIMUM) mcp.enqueue(1);
-  if (config.phValues[1] < Thresholds::PH_MINIMUM) mcp.enqueue(3);
-  if (config.phValues[2] < Thresholds::PH_MINIMUM) mcp.enqueue(5);
+  if (config.phValues[0] < Thresholds::PH_MINIMUM && !queued[1] && cooldown[1].done()) 
+  {
+    cooldown[1].start();
+    mcp.enqueue(1);
+    queued[1] = true;
+  }
+  if (config.phValues[1] < Thresholds::PH_MINIMUM && !queued[3] && cooldown[3].done()) 
+  {
+    cooldown[3].start();
+    mcp.enqueue(3);
+    queued[3] = true;
+  }
+  if (config.phValues[2] < Thresholds::PH_MINIMUM && !queued[5] && cooldown[5].done()) 
+  {
+    cooldown[5].start();
+    mcp.enqueue(5);
+    queued[5] = true;
+  }
 
   // ORP
-  if (config.orpValues[0] < Thresholds::ORP_MINIMUM) mcp.enqueue(2);
-  if (config.orpValues[1] < Thresholds::ORP_MINIMUM) mcp.enqueue(4);
-  if (config.orpValues[2] < Thresholds::ORP_MINIMUM) mcp.enqueue(6);
-  
-  mcp.update();
+  if (config.orpValues[0] < Thresholds::ORP_MINIMUM && !queued[2] && cooldown[2].done()) 
+  {
+    cooldown[2].start();
+    mcp.enqueue(2);
+    queued[2] = true;
+  }
+  if (config.orpValues[1] < Thresholds::ORP_MINIMUM && !queued[4] && cooldown[4].done()) 
+  {
+    cooldown[4].start();
+    mcp.enqueue(4);
+    queued[4] = true;
+  }
+  if (config.orpValues[2] < Thresholds::ORP_MINIMUM && !queued[6] && cooldown[6].done()) 
+  {
+    cooldown[6].start();
+    mcp.enqueue(6);
+    queued[6] = true;
+  }
+
+  mcp.update(queued);
+
 
 
   if (sdLogTimer.isReady())
