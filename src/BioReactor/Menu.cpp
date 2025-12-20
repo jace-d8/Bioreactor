@@ -382,6 +382,12 @@ void Menu::displayPhMenu()
             lcd.setCursor(item.col, item.row);
             lcd.print(item.label);
         }
+        lcd.setCursor(COL_RIGHT, ROW_3);
+        lcd.print("pH");
+        lcd.print(activePh_ + 1);
+        lcd.print(": ");
+        lcd.print(config_->phValues[activePh_], 2);
+        lcd.print("    "); // clears leftovers
 
         // Stars for calibrated buffers of the active pH probe
         if (bufferCalibrated_[activePh_][0]) { lcd.setCursor(COL_MID, ROW_1); lcd.print("*"); }
@@ -411,6 +417,13 @@ void Menu::displayORPCalibrationMenu()
         lcd.print("Calibrate when ready");
         lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Calibrate at 222mV");
         lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Done");
+        lcd.setCursor(COL_LEFT, ROW_3);
+        lcd.print("ORP");
+        lcd.print(activeOrp_ + 1);
+        lcd.print(": ");
+        lcd.print((int)config_->orpValues[activeOrp_]);
+        lcd.print("mV   ");
+
         joystick.setMaxIndex(1);
     }
 

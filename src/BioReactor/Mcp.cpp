@@ -19,12 +19,12 @@ void Mcp::enqueue(int activeValveId)
 
 void Mcp::update(bool queued[])
 {
+  // openValve_ = UPDATE VALVE LOCK HERE
   if(queueTimer.isReady() && !valveQueue_.empty() && !deactivate_ && !openValve_) 
   {
     currentValve_ = valveQueue_.front(); 
     queued[currentValve_] = false;
     valveQueue_.pop();
-    
 
     mcp_.digitalWrite(currentValve_ - 1, HIGH);
     openValve_ = true; 
@@ -36,7 +36,7 @@ void Mcp::update(bool queued[])
   if(valveTimer.isReady() && openValve_)
   {
     openValve_ = false; 
-    mcp_.digitalWrite(currentValve_ - 1, LOW);
+    mcp_.digitalWrite(currentValve_, LOW); // removed -1, if code disfunctions this is why
     currentValve_ = -1;
   }
 }

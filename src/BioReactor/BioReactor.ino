@@ -103,7 +103,6 @@ void setup()
 
 void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started in 4 (below threshold, no trigger), 1 min timer on boot an issue? 
 {
-  // this will all need to be updated for 6 probes
   if (probeTimer.isReady())
     handleProbeReads(config);
 
