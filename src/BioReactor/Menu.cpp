@@ -382,12 +382,6 @@ void Menu::displayPhMenu()
             lcd.setCursor(item.col, item.row);
             lcd.print(item.label);
         }
-        lcd.setCursor(COL_RIGHT, ROW_3);
-        lcd.print("pH");
-        lcd.print(activePh_ + 1);
-        lcd.print(": ");
-        lcd.print(config_->phValues[activePh_], 2);
-        lcd.print("    "); // clears leftovers
 
         // Stars for calibrated buffers of the active pH probe
         if (bufferCalibrated_[activePh_][0]) { lcd.setCursor(COL_MID, ROW_1); lcd.print("*"); }
@@ -397,6 +391,12 @@ void Menu::displayPhMenu()
         joystick.setMaxIndex(4);
     }
 
+    // get live ph reading
+    lcd.setCursor(COL_RIGHT + 1, ROW_3);
+    lcd.print(config_->phValues[activePh_], 2);
+    lcd.print("    ");
+
+    // unhighlight the previous menu item if there's one
     if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem()) 
     {
         const MenuItem& prev = phMenuChoices_[lastSelectedItem_];
@@ -404,6 +404,7 @@ void Menu::displayPhMenu()
         lcd.print(prev.label);
     }
 
+    // print the selected menu item with highlight
     const MenuItem& cur = phMenuChoices_[joystick.getSelectedItem()];
     printMenuItem(cur.col, cur.row, cur.label, cur.index);
 }
@@ -423,7 +424,6 @@ void Menu::displayORPCalibrationMenu()
         lcd.print(": ");
         lcd.print((int)config_->orpValues[activeOrp_]);
         lcd.print("mV   ");
-
         joystick.setMaxIndex(1);
     }
 

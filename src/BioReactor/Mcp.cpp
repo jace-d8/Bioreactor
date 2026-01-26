@@ -26,7 +26,7 @@ void Mcp::update(bool queued[])
     queued[currentValve_] = false;
     valveQueue_.pop();
 
-    mcp_.digitalWrite(currentValve_ - 1, HIGH);
+    mcp_.digitalWrite(currentValve_, HIGH);
     openValve_ = true; 
 
     queueTimer.reset();
