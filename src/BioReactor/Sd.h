@@ -19,7 +19,7 @@ public:
 private:
   File dataFile_;
   String makeNextFilename_();
-  bool runDiagnostics{false};
+  bool runDiagnostics_{false};
   void diag_(const char* line);
 
   bool ready_ = false;

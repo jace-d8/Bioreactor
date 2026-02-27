@@ -4,7 +4,7 @@
 
 void SdLogger::diag_(const char* line) 
 {
-  if(runDiagnostics)
+  if(runDiagnostics_)
   {
     File d = SD.open("/SD_DIAG.TXT", FILE_APPEND);
     if (d) { d.println(line); d.close(); }

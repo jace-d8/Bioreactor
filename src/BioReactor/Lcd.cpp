@@ -1,22 +1,13 @@
 #include "Lcd.h"
 #include "Timer.h"
+#include <Arduino.h>
+#include <stdio.h>
 
-// void Lcd::init()
-// {
-//     lcd_.begin(20, 4);
-//     lcd_.setBacklightPin(3, 1);
-//     lcd_.backlight();
-//     lcd_.setCursor(COL_LEFT, ROW_TITLE);
-//     lcd_.print("LCD initialized");
-// }
-
-// tmp test
 void Lcd::init()
 {
-    delay(1000); 
+    delay(1000);
 
     lcd_.begin(20, 4);
-
     lcd_.setBacklightPin(3, 1);
     lcd_.backlight();
 
@@ -24,7 +15,6 @@ void Lcd::init()
     lcd_.setCursor(COL_LEFT, ROW_TITLE);
     lcd_.print("LCD initialized");
 }
-
 
 void Lcd::updateBlink(ConfigState& config)
 {
@@ -62,32 +52,55 @@ void Lcd::print(float value, int decimals)
     lcd_.print(value, decimals);
 }
 
+// ---- SAFE FIXED WIDTH PRINT ----
 void Lcd::printData(const ConfigState& config)
 {
-// Row 0: pH 1–3
-    lcd_.setCursor(COL_LEFT, ROW_TITLE);   // col 0
+    const int PH_LABEL_COL  = COL_LEFT;
+    const int PH_VALUE_COL  = COL_LEFT + 3;
+
+    const int ORP_LABEL_COL = COL_RIGHT;
+    const int ORP_VALUE_COL = COL_RIGHT + 3;
+
+    const int PH_WIDTH  = 6;   // fits "10.00"
+    const int ORP_WIDTH = 6;   // fits up to 4-digit ORP
+
+    char buffer[16];
+
+    // ---------- pH ----------
+    lcd_.setCursor(PH_LABEL_COL, ROW_TITLE);
     lcd_.print("p1:");
-    lcd_.print(config.phValues[0], 2);
+    lcd_.setCursor(PH_VALUE_COL, ROW_TITLE);
+    snprintf(buffer, sizeof(buffer), "%6.2f", config.phValues[0]);
+    lcd_.print(buffer);
 
-    lcd_.setCursor(COL_LEFT, ROW_1);    // col 6
+    lcd_.setCursor(PH_LABEL_COL, ROW_1);
     lcd_.print("p2:");
-    lcd_.print(config.phValues[1], 2);
+    lcd_.setCursor(PH_VALUE_COL, ROW_1);
+    snprintf(buffer, sizeof(buffer), "%6.2f", config.phValues[1]);
+    lcd_.print(buffer);
 
-    lcd_.setCursor(COL_LEFT, ROW_2);  // col 10
+    lcd_.setCursor(PH_LABEL_COL, ROW_2);
     lcd_.print("p3:");
-    lcd_.print(config.phValues[2], 2);
+    lcd_.setCursor(PH_VALUE_COL, ROW_2);
+    snprintf(buffer, sizeof(buffer), "%6.2f", config.phValues[2]);
+    lcd_.print(buffer);
 
-    // Row 1: ORP 1–3
-    lcd_.setCursor(COL_RIGHT, ROW_TITLE);
+    // ---------- ORP ----------
+    lcd_.setCursor(ORP_LABEL_COL, ROW_TITLE);
     lcd_.print("o1:");
-    lcd_.print(config.orpValues[0], 0);
+    lcd_.setCursor(ORP_VALUE_COL, ROW_TITLE);
+    snprintf(buffer, sizeof(buffer), "%6.0f", config.orpValues[0]);
+    lcd_.print(buffer);
 
-    lcd_.setCursor(COL_RIGHT, ROW_1);
+    lcd_.setCursor(ORP_LABEL_COL, ROW_1);
     lcd_.print("o2:");
-    lcd_.print(config.orpValues[1], 0);
+    lcd_.setCursor(ORP_VALUE_COL, ROW_1);
+    snprintf(buffer, sizeof(buffer), "%6.0f", config.orpValues[1]);
+    lcd_.print(buffer);
 
-    lcd_.setCursor(COL_RIGHT, ROW_2);
+    lcd_.setCursor(ORP_LABEL_COL, ROW_2);
     lcd_.print("o3:");
-    lcd_.print(config.orpValues[2], 0);
-
+    lcd_.setCursor(ORP_VALUE_COL, ROW_2);
+    snprintf(buffer, sizeof(buffer), "%6.0f", config.orpValues[2]);
+    lcd_.print(buffer);
 }

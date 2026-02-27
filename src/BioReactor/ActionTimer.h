@@ -3,16 +3,19 @@ public:
   ActionTimer(unsigned long durationMs)
     : duration_(durationMs), start_(0), running_(false) {}
 
-  void start() {
+  void start() 
+  
     start_ = millis();
     running_ = true;
   }
 
-  void stop() {
+  void stop() 
+  {
     running_ = false;
   }
 
-  bool done() const {
+  bool done() const 
+  {
     if (!running_) return true;  // idle == done
     return millis() - start_ >= duration_;
   }
