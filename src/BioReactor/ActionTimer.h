@@ -4,7 +4,7 @@ public:
     : duration_(durationMs), start_(0), running_(false) {}
 
   void start() 
-  
+  {
     start_ = millis();
     running_ = true;
   }

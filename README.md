@@ -1,8 +1,6 @@
 To be populated before "publication" of repo 
 
 
-To be populated before "publication" of repo 
-
 
 ## Naming Conventions
 
