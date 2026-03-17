@@ -16,8 +16,8 @@ namespace PinConfigurations
 
 namespace Thresholds
 {
-  const float PH_MINIMUM =  6.3f; // changed ph min 
-  const int ORP_MINIMUM = -163; 
+  const float PH_MINIMUM =  6.3f; // 6.3 chosen at Kuang's advice. pH for rumen is 5.5-7.0 pH for anaerobic digesters is 6.5 to 7.5, sometimes lower.
+  const int ORP_MINIMUM = -400; // -400 chosen as default baseline. Rumen varies by region, reactors vary as well. We want +25 mV above anaerobic baseline. 
 }
 
 namespace TimingIntervals // Counted in milliseconds; anything larger than 32,767 MUST be followed by UL
