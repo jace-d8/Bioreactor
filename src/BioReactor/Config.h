@@ -24,8 +24,8 @@ namespace TimingIntervals // Counted in milliseconds; anything larger than 32,76
 {
   const unsigned long PROBE_READ_INTERVAL = 2000UL; // 2 seconds
   const unsigned long SD_LOG_INTERVAL = 2 * 60 * 1000UL; // 2 * 60 seconds/minute * 1000 milliseconds/second
-  const unsigned long VALVE_COOLDOWN = 1 * 70 * 1000UL; // TEMP FIX, added 10 seconds to cooldown to account for activation time
-  const int PH_VALVE_MAX_ACTIVATIONS = 3; 
+  const unsigned long VALVE_COOLDOWN = 60 * 1000UL; 
+  const int PH_VALVE_MAX_ACTIVATIONS = 3;
   const int ORP_VALVE_MAX_ACTIVATIONS = 4; 
   const unsigned long PH_RESET_WINDOW = 4 * 60 * 1000UL; 
   const unsigned long ORP_RESET_WINDOW = 4 * 60 * 1000UL; 

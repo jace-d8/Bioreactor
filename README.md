@@ -1,5 +1,9 @@
 To be populated before "publication" of repo 
 
+Include: names and links of every part used, what it does, who is it for, how to use it, 
+dependicies, video of use, etc
+
+
 
 
 ## Naming Conventions

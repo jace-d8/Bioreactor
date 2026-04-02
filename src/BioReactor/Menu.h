@@ -85,11 +85,11 @@ public:
 
 private:
     // Flow handlers
-    void handleMainMenu();
-    void handleProbesMenu();
-    void handleValvesMenu();
-    void handlePhCalibrationSelection();
-    void handleORPSelection();
+    void handleMainMenu(bool pressed);
+    void handleProbesMenu(bool pressed);
+    void handleValvesMenu(bool pressed);
+    void handlePhCalibrationSelection(bool pressed);
+    void handleORPSelection(bool pressed);
 
     // Screens
     void displayMainMenu();

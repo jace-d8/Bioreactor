@@ -24,13 +24,13 @@ void Menu::enter()
     }
 }
 
-void Menu::update() 
+void Menu::update()
 {
-    bool pressed = joystick.isPressed();     
-    int before = joystick.getSelectedItem();
+    const bool pressed = joystick.isPressed();
+    const int before = joystick.getSelectedItem();
 
     if (!pressed)
-    {                         
+    {
         joystick.move();
         if (joystick.getSelectedItem() != before)
             needsFullRedraw_ = true;
@@ -39,27 +39,21 @@ void Menu::update()
     switch (state_)
     {
         case MenuState::Idle:
-            handleMainMenu();
+            handleMainMenu(pressed);
             break;
         case MenuState::Calibrating:
-            handleProbesMenu();
+            handleProbesMenu(pressed);
             break;
         case MenuState::PhCalibration:
-            if (joystick.isPressed()) 
-            {
-                handlePhCalibrationSelection();
-            }
+            handlePhCalibrationSelection(pressed);
             break;
         case MenuState::OrpCalibration:
-            if (joystick.isPressed()) 
-            {
-                handleORPSelection();
-            }
+            handleORPSelection(pressed);
             break;
         case MenuState::Valves:
-            handleValvesMenu();
+            handleValvesMenu(pressed);
             break;
-        case MenuState::Off:             
+        case MenuState::Off:
             break;
     }
 }
@@ -109,9 +103,9 @@ void Menu::draw()
     lastSelectedItem_ = joystick.getSelectedItem();
 }
 
-void Menu::handleMainMenu() 
+void Menu::handleMainMenu(bool pressed)
 {
-    if (!joystick.isPressed()) return;
+    if (!pressed) return;
 
     switch (joystick.getSelectedItem()) 
     {
@@ -134,9 +128,9 @@ void Menu::handleMainMenu()
     needsFullRedraw_ = true;
 }
 
-void Menu::handleProbesMenu() 
+void Menu::handleProbesMenu(bool pressed)
 {
-    if (!joystick.isPressed()) return;
+    if (!pressed) return;
 
     switch (joystick.getSelectedItem()) 
     {
@@ -195,9 +189,9 @@ void Menu::handleProbesMenu()
     needsFullRedraw_ = true;
 }
 
-void Menu::handleValvesMenu() 
+void Menu::handleValvesMenu(bool pressed)
 {
-    if (!joystick.isPressed()) return;
+    if (!pressed) return;
 
     switch (joystick.getSelectedItem()) 
     {
@@ -213,9 +207,10 @@ void Menu::handleValvesMenu()
     needsFullRedraw_ = true;
 }
 
-void Menu::handlePhCalibrationSelection() 
+void Menu::handlePhCalibrationSelection(bool pressed)
 {
-    switch (joystick.getSelectedItem()) 
+    if (!pressed) return;
+    switch (joystick.getSelectedItem())
     {
         case BUFFER_4:
             phSensors_[activePh_]->sendCmd("Cal,low,4.00");
@@ -244,9 +239,10 @@ void Menu::handlePhCalibrationSelection()
     needsFullRedraw_ = true;
 }
 
-void Menu::handleORPSelection() 
+void Menu::handleORPSelection(bool pressed) 
 {
-    switch (joystick.getSelectedItem()) 
+    if (!pressed) return;
+    switch (joystick.getSelectedItem())
     {
         case 0:
             orpSensors_[activeOrp_]->sendCmd("Cal,222");

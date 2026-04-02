@@ -44,12 +44,12 @@ Timer valveCooldownTimerPh(TimingIntervals::VALVE_COOLDOWN);
 Timer valveCooldownTimerOrp(TimingIntervals::VALVE_COOLDOWN);
 
 ActionTimer cooldown[6] = { // test 
-  ActionTimer(60000),   // 1  PH0
-  ActionTimer(60000),   // 2  ORP0
-  ActionTimer(60000),   // 3  PH1
-  ActionTimer(60000),   // 4  ORP1
-  ActionTimer(60000),   // 5  PH2
-  ActionTimer(60000)    // 6  ORP2
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 1  PH0
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 2  ORP0
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 3  PH1
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 4  ORP1
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 5  PH2
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN)    // 6  ORP2
 };
 
 
@@ -60,7 +60,7 @@ ConfigState config;
 Menu menu(&config, phSensors, orpSensors, lcd);
 
 // ----- Membership Tracker -----
-bool queued[7] = {false};
+bool queued[6] = {false};
 
 // ----- Forward decls -----
 void handleProbeReads(ConfigState& config);
@@ -78,7 +78,7 @@ void setup()
 
   Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, 100000);   // 100 kHz is fine
 
-  mcp.begin();
+  const bool mcpReady = mcp.begin();
 
   // LCD
   lcd.init();
@@ -91,10 +91,19 @@ void setup()
 
   // --- SD init: explicit CS pin ---
   // used a conservative SPI freq for stability; can raise later.
-  sd.begin(PinConfigurations::SD_CHIP_SELECT ,1000000);
+  const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT ,1000000);
 
   // Build-time RTC seed
   sd.setTimeFromBuild();
+
+  if (!mcpReady || !sdReady)
+  {
+    lcd.clear();
+    lcd.setCursor(COL_LEFT, ROW_TITLE);
+    lcd.print(!mcpReady ? "MCP init failed" : "SD init failed");
+    lcd.setCursor(COL_LEFT, ROW_1);
+    lcd.print(!mcpReady && !sdReady ? "SD init failed" : "Check wiring");
+  }
 
   // First log line
   sd.log(config, "BOOT");
@@ -149,7 +158,6 @@ void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started i
     }
   }
   mcp.update(queued);
-
 
 
   if (sdLogTimer.isReady())

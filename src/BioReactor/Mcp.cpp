@@ -11,7 +11,7 @@ void Mcp::enqueue(int activeValveId)
   {
     return;
   }
-  if (!deactivate_ && activeValveId > 0 && activeValveId <= 6) 
+  if (!deactivate_ && activeValveId >= 0 && activeValveId < VALVE_COUNT) 
   {
     valveQueue_.push(activeValveId);
   }
@@ -36,7 +36,7 @@ void Mcp::update(bool queued[])
   if(valveTimer.isReady() && openValve_)
   {
     openValve_ = false; 
-    mcp_.digitalWrite(currentValve_, LOW); // removed -1, if code disfunctions this is why
+    mcp_.digitalWrite(currentValve_, LOW); 
     currentValve_ = -1;
   }
 }

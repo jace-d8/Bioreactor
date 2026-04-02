@@ -1,6 +1,7 @@
 #pragma once
 #include <Adafruit_MCP23X17.h>
 #include <queue>
+#define VALVE_COUNT 6
 
 // Valve id numbers will be 1-6
 class Mcp
@@ -20,7 +21,7 @@ public:
     if (!mcp_.begin_I2C())   // optional: check return
       return false;
 
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < VALVE_COUNT; ++i)
       mcp_.pinMode(i, OUTPUT);
 
     return true;
