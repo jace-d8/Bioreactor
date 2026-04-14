@@ -9,91 +9,144 @@
 #include "ActionTimer.h"
 #include "Menu.h"
 
-// TO-DO: Time valve cooldown check irl and make sure its 60 seconds (not 50), 
+#define UTC_OFFSET (-7 * 3600)
 
-// ----- Time config -----
-#define UTC_OFFSET (-7 * 3600)   // adjust if needed
+ConfigState config;
 
-EzoBoard orpSensors[3] = { // consider changing hardcoded values later 
+EzoBoard orpSensors[3] = {
   EzoBoard(98,  "ORP"),
   EzoBoard(100, "ORP"),
   EzoBoard(102, "ORP")
 };
 
 EzoBoard phSensors[3] = {
-  EzoBoard(99,  "PH"),
-  EzoBoard(101, "PH"),
-  EzoBoard(103, "PH")
+  EzoBoard(99,  "pH"),
+  EzoBoard(101, "pH"),
+  EzoBoard(103, "pH")
 };
 
-// ----- Valves -----
 Mcp mcp;
-
-// ----- UI -----
 Lcd lcd(0x27, &Wire1);
-
-// ----- SD Logger -----
-SdLogger sd;   
-
-// ----- Timers -----
-Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
-Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
-Timer phCountResetTimer(TimingIntervals::PH_RESET_WINDOW);
-Timer orpCountResetTimer(TimingIntervals::ORP_RESET_WINDOW);
-Timer valveCooldownTimerPh(TimingIntervals::VALVE_COOLDOWN);
-Timer valveCooldownTimerOrp(TimingIntervals::VALVE_COOLDOWN);
-
-ActionTimer cooldown[6] = { // test 
-  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 1  PH0
-  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 2  ORP0
-  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 3  PH1
-  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 4  ORP1
-  ActionTimer(TimingIntervals::VALVE_COOLDOWN),   // 5  PH2
-  ActionTimer(TimingIntervals::VALVE_COOLDOWN)    // 6  ORP2
-};
-
-
-
-
-// ----- Config state & Menu -----
-ConfigState config;
+SdLogger sd;
 Menu menu(&config, phSensors, orpSensors, lcd);
 
-// ----- Membership Tracker -----
-bool queued[6] = {false};
+Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
+Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
 
-// ----- Forward decls -----
-void handleProbeReads(ConfigState& config);
-void handlePhValve();
-void handleOrpValve();
+bool queued[ValveMappings::TOTAL_VALVES] = { false };
+
+ActionTimer cooldown[ValveMappings::TOTAL_VALVES] = {
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN),
+  ActionTimer(TimingIntervals::VALVE_COOLDOWN)
+};
+
+unsigned long valveTriggerTimes[ValveMappings::TOTAL_VALVES][TimingIntervals::MAX_VALVE_ERROR_HISTORY] = {};
+int valveTriggerCounts[ValveMappings::TOTAL_VALVES] = {};
+
+bool tryQueueValve(int valveId, bool condition)
+{
+  if (!condition) return false;
+  if (config.valvesDisabled) return false;
+  if (queued[valveId]) return false;
+  if (config.valveErrorLocked[valveId]) return false;
+  if (!cooldown[valveId].done()) return false;
+  if (!mcp.enqueue(valveId)) return false;
+
+  cooldown[valveId].start();
+  queued[valveId] = true;
+  return true;
+}
+
+void recordValveTrigger(int valveId)
+{
+  int &count = valveTriggerCounts[valveId];
+
+  if (count < TimingIntervals::MAX_VALVE_ERROR_HISTORY)
+  {
+    valveTriggerTimes[valveId][count++] = millis();
+  }
+  else
+  {
+    for (int i = 1; i < TimingIntervals::MAX_VALVE_ERROR_HISTORY; ++i)
+      valveTriggerTimes[valveId][i - 1] = valveTriggerTimes[valveId][i];
+
+    valveTriggerTimes[valveId][TimingIntervals::MAX_VALVE_ERROR_HISTORY - 1] = millis();
+  }
+
+  const bool isPhValve = (valveId % 2 == 0);
+  const int limit = isPhValve
+    ? TimingIntervals::PH_VALVE_TRIGGER_LIMIT
+    : TimingIntervals::ORP_VALVE_TRIGGER_LIMIT;
+
+  if (count >= limit)
+  {
+    unsigned long oldest = valveTriggerTimes[valveId][count - limit];
+    if (millis() - oldest < TimingIntervals::VALVE_ERROR_WINDOW)
+    {
+      if (!config.valveErrorLocked[valveId])
+      {
+        config.valveErrorLocked[valveId] = true;
+        sd.logValveLocked(valveId);
+      }
+    }
+  }
+}
+
+void resetValveErrors()
+{
+  for (int i = 0; i < ValveMappings::TOTAL_VALVES; ++i)
+  {
+    config.valveErrorLocked[i] = false;
+    valveTriggerCounts[i] = 0;
+
+    for (int j = 0; j < TimingIntervals::MAX_VALVE_ERROR_HISTORY; ++j)
+      valveTriggerTimes[i][j] = 0;
+  }
+
+  config.requestResetErrors = false;
+}
+
+void handleProbeReads()
+{
+  for (int i = 0; i < 3; ++i)
+  {
+    config.phValues[i] = phSensors[i].read();
+    config.orpValues[i] = orpSensors[i].read();
+
+    config.phValid[i] = phSensors[i].hasValidReading();
+    config.orpValid[i] = orpSensors[i].hasValidReading();
+  }
+
+  if (!config.lcdCleared)
+  {
+    lcd.clear();
+    config.lcdCleared = true;
+  }
+
+  if (!menu.isActive())
+    lcd.printData(config);
+}
 
 void setup()
 {
-  // Serial optional:
-  // Serial.begin(9600);
-
-  // I2C
-  Wire.begin(); // SDA = GPIO4, A3, SCL = GPIO11, A4
+  Wire.begin();
   Wire.setClock(100000);
 
-  Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, 100000);   // 100 kHz is fine
+  Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, 100000);
 
   const bool mcpReady = mcp.begin();
 
-  // LCD
   lcd.init();
 
-  // SPI must come BEFORE SD.begin()
   SPI.begin();
 
-  // Set system time base (no NTP host)
   configTime(UTC_OFFSET, 0, "");
 
-  // --- SD init: explicit CS pin ---
-  // used a conservative SPI freq for stability; can raise later.
-  const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT ,1000000);
-
-  // Build-time RTC seed
+  const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT, 1000000);
   sd.setTimeFromBuild();
 
   if (!mcpReady || !sdReady)
@@ -105,87 +158,41 @@ void setup()
     lcd.print(!mcpReady && !sdReady ? "SD init failed" : "Check wiring");
   }
 
-  // First log line
-  sd.log(config, "BOOT");
+  sd.logMessage("BOOT");
 }
 
-void loop() // cooldown is 50 seconds rather than 1 minute // if ph is started in 4 (below threshold, no trigger), 1 min timer on boot an issue? 
+void loop()
 {
   if (probeTimer.isReady())
-    handleProbeReads(config);
+    handleProbeReads();
 
+  if (config.requestResetErrors)
+    resetValveErrors();
 
-  if (!config.valvesDisabled)
+  tryQueueValve(0, config.phValid[0] && config.phValues[0] < Thresholds::PH_MINIMUM);
+  tryQueueValve(2, config.phValid[1] && config.phValues[1] < Thresholds::PH_MINIMUM);
+  tryQueueValve(4, config.phValid[2] && config.phValues[2] < Thresholds::PH_MINIMUM);
+
+  tryQueueValve(1, config.orpValid[0] && config.orpValues[0] < Thresholds::ORP_MINIMUM);
+  tryQueueValve(3, config.orpValid[1] && config.orpValues[1] < Thresholds::ORP_MINIMUM);
+  tryQueueValve(5, config.orpValid[2] && config.orpValues[2] < Thresholds::ORP_MINIMUM);
+
+  int openedValve = mcp.update(queued);
+  if (openedValve >= 0)
   {
-    // PH
-    if (config.phValues[0] < Thresholds::PH_MINIMUM && !queued[0] && cooldown[0].done()) 
-    {
-      cooldown[0].start();
-      mcp.enqueue(0);
-      queued[0] = true;
-    }
-    if (config.phValues[1] < Thresholds::PH_MINIMUM && !queued[2] && cooldown[2].done()) 
-    {
-      cooldown[2].start();
-      mcp.enqueue(2);
-      queued[2] = true;
-    }
-    if (config.phValues[2] < Thresholds::PH_MINIMUM && !queued[4] && cooldown[4].done()) 
-    {
-      cooldown[4].start();
-      mcp.enqueue(4);
-      queued[4] = true;
-    }
-
-    // ORP
-    if (config.orpValues[0] < Thresholds::ORP_MINIMUM && !queued[1] && cooldown[1].done()) 
-    {
-      cooldown[1].start();
-      mcp.enqueue(1);
-      queued[1] = true;
-    }
-    if (config.orpValues[1] < Thresholds::ORP_MINIMUM && !queued[3] && cooldown[3].done()) 
-    {
-      cooldown[3].start();
-      mcp.enqueue(3);
-      queued[3] = true;
-    }
-    if (config.orpValues[2] < Thresholds::ORP_MINIMUM && !queued[5] && cooldown[5].done()) 
-    {
-      cooldown[5].start();
-      mcp.enqueue(5);
-      queued[5] = true;
-    }
+    sd.logValveOn(openedValve);
+    recordValveTrigger(openedValve);
   }
-  mcp.update(queued);
-
 
   if (sdLogTimer.isReady())
-    sd.log(config);  
+    sd.logData(config);
 
   if (!menu.isActive() && menu.joystick.isPressed())
     menu.enter();
 
-  if (menu.isActive()) 
+  if (menu.isActive())
   {
     menu.update();
     menu.draw();
   }
-}
-
-void handleProbeReads(ConfigState& config)
-{
-  for (int i = 0; i < 3; ++i) 
-  {
-    config.phValues[i]  = phSensors[i].read();
-    config.orpValues[i] = orpSensors[i].read();
-  }
-
-  if (!config.lcdCleared) // find cleaner way to do this
-  {
-    lcd.clear();
-    config.lcdCleared = true;
-  }
-  if (!menu.isActive())
-    lcd.printData(config);
 }

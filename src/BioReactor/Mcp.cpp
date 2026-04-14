@@ -1,46 +1,55 @@
 #include "Mcp.h"
 #include "Timer.h"
-#include "Config.h"
 
-Timer queueTimer(TimingIntervals::QUEUE_TIMER); // 12 seconds 
-Timer valveTimer(TimingIntervals::VALVE_TIMER); // 10 seconds
+Timer queueTimer(12000);
+Timer valveTimer(10000);
 
-void Mcp::enqueue(int activeValveId)
+bool Mcp::begin()
 {
-  if (valveQueue_.size() >= 6) 
-  {
-    return;
-  }
-  if (!deactivate_ && activeValveId >= 0 && activeValveId < VALVE_COUNT) 
-  {
-    valveQueue_.push(activeValveId);
-  }
+  if (!mcp_.begin_I2C()) return false;
+
+  for (int i = 0; i < 6; ++i)
+    mcp_.pinMode(i, OUTPUT);
+
+  queueTimer.reset();
+  valveTimer.reset();
+
+  return true;
 }
 
-void Mcp::update(bool queued[])
+bool Mcp::enqueue(int valveId)
 {
-  // openValve_ = UPDATE VALVE LOCK HERE
-  if(queueTimer.isReady() && !valveQueue_.empty() && !deactivate_ && !openValve_) 
+  if (valveQueue_.size() >= 6)
+    return false;
+
+  valveQueue_.push(valveId);
+  return true;
+}
+
+int Mcp::update(bool queued[])
+{
+  int openedValve = -1;
+
+  if (queueTimer.isReady() && !valveQueue_.empty() && !openValve_)
   {
-    currentValve_ = valveQueue_.front(); 
-    queued[currentValve_] = false;
+    currentValve_ = valveQueue_.front();
     valveQueue_.pop();
 
     mcp_.digitalWrite(currentValve_, HIGH);
-    openValve_ = true; 
+    openValve_ = true;
 
-    queueTimer.reset();
+    queued[currentValve_] = false;
+    openedValve = currentValve_;
+
     valveTimer.reset();
-  } 
+  }
 
-  if(valveTimer.isReady() && openValve_)
+  if (valveTimer.isReady() && openValve_)
   {
-    openValve_ = false; 
-    mcp_.digitalWrite(currentValve_, LOW); 
+    mcp_.digitalWrite(currentValve_, LOW);
+    openValve_ = false;
     currentValve_ = -1;
   }
+
+  return openedValve;
 }
-
-
-
-

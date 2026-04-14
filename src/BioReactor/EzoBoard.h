@@ -1,19 +1,26 @@
-// EzoBoard.h
 #pragma once
 #include <Ezo_i2c.h>
 #include "Timer.h"
+#include "Config.h"
 
 class EzoBoard {
 private:
   Ezo_board ezo_;
-  int address_;
   float lastValue_{0};
-  String probeType_;
+  bool valid_{false};
   char response_[32];
-  Timer readTimer_{900}; // replace with config constant 900U
+  Timer readTimer_{TimingIntervals::EZO_READ_INTERVAL};
+
 public:
   enum class ProbeState { Reading, Waiting, Receiving } state_ = ProbeState::Reading;
+
   EzoBoard(int address, String s);
+
   float read();
+  bool hasValidReading() const { return valid_; }
+
   void sendCmd(String cmd);
+
+
+  void setTemperature(float tempC);
 };
