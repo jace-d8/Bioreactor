@@ -11,9 +11,7 @@ bool Mcp::begin()
   for (int i = 0; i < 6; ++i)
     mcp_.pinMode(i, OUTPUT);
 
-  queueTimer.reset();
-  valveTimer.reset();
-
+  resetState(nullptr);
   return true;
 }
 
@@ -52,4 +50,24 @@ int Mcp::update(bool queued[])
   }
 
   return openedValve;
+}
+
+void Mcp::resetState(bool queued[])
+{
+  while (!valveQueue_.empty())
+    valveQueue_.pop();
+
+  for (int i = 0; i < 6; ++i)
+  {
+    mcp_.digitalWrite(i, LOW);
+
+    if (queued)
+      queued[i] = false;
+  }
+
+  openValve_ = false;
+  currentValve_ = -1;
+
+  queueTimer.reset();
+  valveTimer.reset();
 }

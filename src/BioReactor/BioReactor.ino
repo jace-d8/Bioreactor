@@ -102,10 +102,13 @@ void resetValveErrors()
   {
     config.valveErrorLocked[i] = false;
     valveTriggerCounts[i] = 0;
+    queued[i] = false;
 
     for (int j = 0; j < TimingIntervals::MAX_VALVE_ERROR_HISTORY; ++j)
       valveTriggerTimes[i][j] = 0;
   }
+
+  mcp.resetState(queued);
 
   config.requestResetErrors = false;
 }
