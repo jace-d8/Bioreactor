@@ -18,14 +18,14 @@ dependicies, video of use, etc
 
 
 Libraries needed for this project:
-SD by SparkFun
+  SD by SparkFun
 
-Adafruit MCP23017 Arduino Library by Adafruit
+  Adafruit MCP23017 Arduino Library by Adafruit
 
-I2C_LCD by Rob Tillaart
+  I2C_LCD by Rob Tillaart
 
-LiquidCrystal I2C by Frank de Barbander
+  LiquidCrystal I2C by Frank de Barbander
 
-External Library: Ezo_I2c_lib by Atlas-Scientific - this needs to be downloaded from the Atlas-Scientific GitHub Page and installed manually to the Arduino IDE
+  External Library: Ezo_I2c_lib by Atlas-Scientific - this needs to be downloaded from the Atlas-Scientific GitHub Page and installed manually to the Arduino IDE
 
 Also, in Arduino IDE, the Pin Numbering needs to be set as "By GRIO number (legacy)" under "Tools".
