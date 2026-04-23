@@ -20,7 +20,7 @@ void Menu::enter()
         state_ = MenuState::Idle;
         needsFullRedraw_ = true;
         joystick.setSelectedItem(0);
-        joystick.setMaxIndex(2); // Main menu 0..2
+        joystick.setMaxIndex(2);
     }
 }
 
@@ -116,7 +116,7 @@ void Menu::handleMainMenu(bool pressed)
             break;
         case 1:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(1);
+            joystick.setMaxIndex(2);
             state_ = MenuState::Valves;
             break;
         case 2:
@@ -193,12 +193,15 @@ void Menu::handleValvesMenu(bool pressed)
 {
     if (!pressed) return;
 
-    switch (joystick.getSelectedItem()) 
+    switch (joystick.getSelectedItem())
     {
         case 0:
             config_->valvesDisabled = !config_->valvesDisabled;
             break;
         case 1:
+            config_->requestResetErrors = true;
+            break;
+        case 2:
             joystick.setSelectedItem(0);
             joystick.setMaxIndex(2);
             state_ = MenuState::Idle;
@@ -346,23 +349,26 @@ void Menu::displayValvesMenu()
         lcd.setCursor(COL_LEFT, ROW_TITLE);
         lcd.print(config_->valvesDisabled ? "Valves are: OFF" : "Valves are: ON ");
         lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Switch valves");
-        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Return");
-        joystick.setMaxIndex(1);
+        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Reset error");
+        lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Return");
+        joystick.setMaxIndex(2);
     }
 
     if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem()) 
     {
-        switch (lastSelectedItem_) 
+        switch (lastSelectedItem_)
         {
             case 0: lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Switch valves"); break;
-            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Return       "); break;
+            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Reset error "); break;
+            case 2: lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Return      "); break;
         }
     }
 
-    switch (joystick.getSelectedItem()) 
+    switch (joystick.getSelectedItem())
     {
         case 0: printMenuItem(COL_LEFT, ROW_1, "Switch valves", 0); break;
-        case 1: printMenuItem(COL_LEFT, ROW_2, "Return",        1); break;
+        case 1: printMenuItem(COL_LEFT, ROW_2, "Reset error",  1); break;
+        case 2: printMenuItem(COL_LEFT, ROW_3, "Return",       2); break;
     }
 }
 
