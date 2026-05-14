@@ -22,40 +22,30 @@ I did not implement the cross-Arduino feed queue arbitration yet (the goal there
 
 ## Reactor state machine
 
-```
-            ┌─────────────────┐
-            │ Recirculating   │◀─────────────────── drain complete
-            └────────┬────────┘
-                     │ both LS dry, or LS_B wet & LS_A dry
-                     ▼
-            ┌─────────────────┐
-            │ WaitingForFill  │   (queued behind another reactor)
-            └────────┬────────┘
-                     │ pulled from queue
-                     ▼
-            ┌─────────────────┐
-            │ Filling         │ FV open, both LS wet ──┐
-            └─────────────────┘                         │
-                     │ 5 s timeout, LS_A still dry      │
-                     ▼                                  ▼
-              ErrorLsA                          ┌─────────────────┐
-                                                │ Holding         │
-                                                │ (60 min timer)  │
-                                                └────────┬────────┘
-                                                         │ timer elapsed
-                                                         ▼
-                                                ┌─────────────────┐
-                                                │ WaitingForDrain │
-                                                └────────┬────────┘
-                                                         │ pulled from queue
-                                                         ▼
-                                                ┌─────────────────┐
-                                                │ Draining        │ WV open + WV0 closed
-                                                │                 │ both LS dry ──▶ Recirculating
-                                                └─────────────────┘
-                                                         │ 10 s timeout, LS_B still wet
-                                                         ▼
-                                                   ErrorLsB
+```mermaid
+stateDiagram-v2
+    direction TB
+    [*] --> Recirculating
+
+    Recirculating --> WaitingForFill: both LS dry,<br/>or LS_B wet & LS_A dry
+    WaitingForFill --> Filling: pulled from feed queue
+    Filling --> Holding: both LS wet
+    Filling --> ErrorLsA: 5 s timeout,<br/>LS_A still dry
+
+    Holding --> WaitingForDrain: 60 min hold elapsed
+    Holding --> WaitingForFill: level drops<br/>(LS_B wet, LS_A dry)
+
+    WaitingForDrain --> Draining: pulled from waste queue
+    Draining --> Recirculating: both LS dry<br/>(WV0 reopens)
+    Draining --> ErrorLsB: 10 s timeout,<br/>LS_B still wet
+
+    Recirculating --> ErrorLsB: LS_A wet & LS_B dry<br/>(physically impossible)
+
+    ErrorLsA --> Recirculating: Reset LS Err (menu)
+    ErrorLsB --> Recirculating: Reset LS Err (menu)
+
+    classDef errorState fill:#7a1f1f,stroke:#ff6b6b,color:#fff
+    class ErrorLsA,ErrorLsB errorState
 ```
 
 **Sensor sanity check**: any time the reactor is steady (no valve active), if `LS_A` reads liquid and `LS_B` reads dry (physically impossible since A is above B), I latch `ErrorLsB`.
