@@ -51,7 +51,7 @@ MCP23017 outputs:
 | 4 | pH3 dosing valve |
 | 5 | ORP3 dosing valve |
 
-EZO I2C addresses (set in [`BioReactor.ino`](src/BioReactor/BioReactor.ino)):
+EZO I2C addresses (declared in [`Config.h`](src/BioReactor/Config.h) under `EzoAddresses`, instantiated in [`BioReactor.ino`](src/BioReactor/BioReactor.ino)):
 
 | Probe | I2C address |
 |---|---|
@@ -69,21 +69,44 @@ namespace Thresholds
   const int   ORP_MINIMUM = -400;  // dose oxidizer if ORP drops below
 }
 
+namespace BusSpeeds
+{
+  const uint32_t I2C_HZ    = 100000UL;    // both Wire and Wire1
+  const uint32_t SD_SPI_HZ = 1000000UL;   // SD card SPI clock
+}
+
+namespace JoystickConfig
+{
+  const int           ANALOG_CENTER       = 1980;    // analogRead center value
+  const int           ANALOG_DEADZONE     = 400;     // counts above/below center before scrolling
+  const unsigned long SCROLL_DELAY_MS     = 200UL;   // throttle between menu scrolls
+  const unsigned long SWITCH_DEBOUNCE_MS  = 300UL;   // joystick push-button debounce
+}
+
+namespace EzoAddresses
+{
+  const int PH[3]  = {99, 101, 103};
+  const int ORP[3] = {98, 100, 102};
+}
+
 namespace TimingIntervals
 {
-  const unsigned long PROBE_READ_INTERVAL  = 2000UL;             // probe polling
-  const unsigned long SD_LOG_INTERVAL      = 2000UL;             // SD write cadence
-  const unsigned long VALVE_COOLDOWN       = 60UL * 1000UL;      // per-valve refire lockout
-  const unsigned long VALVE_ERROR_WINDOW   = 60UL*60UL*1000UL;   // rolling error window
-  const int PH_VALVE_TRIGGER_LIMIT  = 10;                        // max pH fires per window
-  const int ORP_VALVE_TRIGGER_LIMIT = 20;                        // max ORP fires per window
-  const int MAX_VALVE_ERROR_HISTORY = 20;                        // ring buffer size
-  const unsigned long EZO_READ_INTERVAL = 900UL;                 // EZO state-machine tick
-  const unsigned long QUEUE_TIMER       = 12000UL;               // min gap between queue pops
-  const unsigned long VALVE_TIMER       = 10000UL;               // how long a valve stays open
-  const unsigned long BLINK_INTERVAL    = 300UL;                 // menu cursor blink
+  const unsigned long PROBE_READ_INTERVAL = 2000UL;             // probe polling
+  const unsigned long SD_LOG_INTERVAL     = 2000UL;             // SD write cadence
+  const unsigned long VALVE_COOLDOWN      = 60UL * 1000UL;      // per-valve refire lockout
+  const unsigned long VALVE_ERROR_WINDOW  = 60UL*60UL*1000UL;   // rolling error window
+  const int PH_VALVE_TRIGGER_LIMIT  = 10;                       // max pH fires per window
+  const int ORP_VALVE_TRIGGER_LIMIT = 20;                       // max ORP fires per window
+  const int MAX_VALVE_ERROR_HISTORY = 20;                       // ring buffer size
+  const unsigned long BLINK_INTERVAL      = 300UL;              // menu cursor blink
+  const unsigned long UI_RENDER_INTERVAL  = 80UL;               // menu redraw cap (~12.5 FPS)
+  const unsigned long EZO_READ_INTERVAL   = 900UL;              // EZO state-machine tick
+  const unsigned long QUEUE_TIMER         = 12000UL;            // min gap between queue pops
+  const unsigned long VALVE_TIMER         = 10000UL;            // how long a valve stays open
 }
 ```
+
+`VALVE_TIMER` and `QUEUE_TIMER` are read by [`Mcp.cpp`](src/BioReactor/Mcp.cpp) and control the dosing valve on-time and the inter-valve gap. To shorten a dose (e.g. for tighter NaOH or air control), reduce `VALVE_TIMER` and keep `QUEUE_TIMER` at least as large.
 
 ## Module map
 
