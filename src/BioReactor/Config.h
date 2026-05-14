@@ -11,8 +11,8 @@ namespace PinConfigurations
   const int LCD_PIN_SCL = 7;
   const int SD_CHIP_SELECT = 21;
 
-  const uint8_t LS_A_PINS[3] = {8, 10, 12};
-  const uint8_t LS_B_PINS[3] = {9, 11, 13};
+  const uint8_t LS_A_PINS[3] = {8, 13, A1};
+  const uint8_t LS_B_PINS[3] = {9, A0, A2};
 }
 
 namespace McpPins

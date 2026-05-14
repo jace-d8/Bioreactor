@@ -87,14 +87,12 @@ Convention: sensor reads **HIGH = no liquid** (I matched the gas-counter pattern
 |------------:|-----------------|
 | D8          | LS1-A (reactor 1, upper) |
 | D9          | LS1-B (reactor 1, lower) |
-| D10         | LS2-A (reactor 2, upper) |
-| D11         | LS2-B (reactor 2, lower) |
-| D12         | LS3-A (reactor 3, upper) |
-| D13         | LS3-B (reactor 3, lower) |
+| D13         | LS2-A (reactor 2, upper) |
+| A0          | LS2-B (reactor 2, lower) |
+| A1          | LS3-A (reactor 3, upper) |
+| A2          | LS3-B (reactor 3, lower) |
 
-I configured these as `pinMode(INPUT)` with no internal pull-up, matching the gas counter wiring.
-
-> ⚠ **SPI conflict warning**: on Nano ESP32, the default hardware SPI bus uses D11/D12/D13. If the SD card library is using that bus, you should move LS2-B, LS3-A, LS3-B to D3, D4, A0 (or similar free pins) and update `PinConfigurations::LS_A_PINS` and `LS_B_PINS` in [`Config.h`](src/BioReactor/Config.h). Bench-verify before wiring up the full system.
+I configured these as `pinMode(INPUT)` with no internal pull-up, matching the gas counter wiring. D10–D12 are reserved by other subsystems, so I kept the LS inputs off that range.
 
 ## Configurables
 
