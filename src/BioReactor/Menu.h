@@ -54,7 +54,7 @@ private:
     int lastSelectedItem_ = -1;
     MenuState lastDrawnState_ = MenuState::Off;
     bool needsFullRedraw_ = true;
-    Timer uiTimer_{80};  // ~12.5 FPS render cap
+    Timer uiTimer_{TimingIntervals::UI_RENDER_INTERVAL};
 
     // Static menu layouts
     const MenuItem calMenuChoices_[6] = {

@@ -1,8 +1,9 @@
 #include "Mcp.h"
+#include "Config.h"
 #include "Timer.h"
 
-Timer queueTimer(12000);
-Timer valveTimer(10000);
+Timer queueTimer(TimingIntervals::QUEUE_TIMER);
+Timer valveTimer(TimingIntervals::VALVE_TIMER);
 
 bool Mcp::begin()
 {

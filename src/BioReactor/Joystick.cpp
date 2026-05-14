@@ -1,26 +1,27 @@
 #include "Joystick.h"
+#include "Config.h"
 
 void Joystick::move()
 {
     int yVal = analogRead(pinY_);
-    const int deadZone = 400; 
-    const int center = 1980; 
+    const int center = JoystickConfig::ANALOG_CENTER;
+    const int deadZone = JoystickConfig::ANALOG_DEADZONE;
 
-    if (yVal < center - deadZone) 
+    if (yVal < center - deadZone)
     { // Up
-        if (selectedItem_ > 0) 
+        if (selectedItem_ > 0)
             selectedItem_--;
-        else 
+        else
             selectedItem_ = maxIndex_; // Wrap to last
-        delay(200); // Prevent rapid scrolling
-    } 
-    else if (yVal > center + deadZone) 
+        delay(JoystickConfig::SCROLL_DELAY_MS); // Prevent rapid scrolling
+    }
+    else if (yVal > center + deadZone)
     { // Down
-        if (selectedItem_ < maxIndex_) 
+        if (selectedItem_ < maxIndex_)
             selectedItem_++;
-        else 
+        else
             selectedItem_ = 0; // Wrap to first
-        delay(200);
+        delay(JoystickConfig::SCROLL_DELAY_MS);
     }
 }
 

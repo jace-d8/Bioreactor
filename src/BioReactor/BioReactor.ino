@@ -14,15 +14,15 @@
 ConfigState config;
 
 EzoBoard orpSensors[3] = {
-  EzoBoard(98,  "ORP"),
-  EzoBoard(100, "ORP"),
-  EzoBoard(102, "ORP")
+  EzoBoard(EzoAddresses::ORP[0], "ORP"),
+  EzoBoard(EzoAddresses::ORP[1], "ORP"),
+  EzoBoard(EzoAddresses::ORP[2], "ORP")
 };
 
 EzoBoard phSensors[3] = {
-  EzoBoard(99,  "pH"),
-  EzoBoard(101, "pH"),
-  EzoBoard(103, "pH")
+  EzoBoard(EzoAddresses::PH[0], "pH"),
+  EzoBoard(EzoAddresses::PH[1], "pH"),
+  EzoBoard(EzoAddresses::PH[2], "pH")
 };
 
 Mcp mcp;
@@ -137,9 +137,9 @@ void handleProbeReads()
 void setup()
 {
   Wire.begin();
-  Wire.setClock(100000);
+  Wire.setClock(BusSpeeds::I2C_HZ);
 
-  Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, 100000);
+  Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, BusSpeeds::I2C_HZ);
 
   const bool mcpReady = mcp.begin();
 
@@ -149,7 +149,7 @@ void setup()
 
   configTime(UTC_OFFSET, 0, "");
 
-  const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT, 1000000);
+  const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT, BusSpeeds::SD_SPI_HZ);
   sd.setTimeFromBuild();
 
   if (!mcpReady || !sdReady)

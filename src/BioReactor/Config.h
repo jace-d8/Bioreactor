@@ -18,6 +18,26 @@ namespace Thresholds
   const int ORP_MINIMUM = -400;
 }
 
+namespace BusSpeeds
+{
+  const uint32_t I2C_HZ = 100000UL;
+  const uint32_t SD_SPI_HZ = 1000000UL;
+}
+
+namespace JoystickConfig
+{
+  const int ANALOG_CENTER = 1980;
+  const int ANALOG_DEADZONE = 400;
+  const unsigned long SCROLL_DELAY_MS = 200UL;
+  const unsigned long SWITCH_DEBOUNCE_MS = 300UL;
+}
+
+namespace EzoAddresses
+{
+  const int PH[3]  = {99, 101, 103};
+  const int ORP[3] = {98, 100, 102};
+}
+
 namespace TimingIntervals
 {
   const unsigned long PROBE_READ_INTERVAL = 2000UL;
@@ -31,6 +51,7 @@ namespace TimingIntervals
   const int MAX_VALVE_ERROR_HISTORY = 20;
 
   const unsigned long BLINK_INTERVAL = 300UL;
+  const unsigned long UI_RENDER_INTERVAL = 80UL;
 
   const unsigned long EZO_READ_INTERVAL = 900UL;
   const unsigned long QUEUE_TIMER = 12000UL;

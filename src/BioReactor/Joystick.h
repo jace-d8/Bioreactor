@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "Config.h"
 #include "Timer.h"
 
 class Joystick 
@@ -13,9 +14,9 @@ private:
     Timer debounceTimer_;
 public:
 
-    Joystick(int pinY, int pinSW, int maxIndex) 
-        : pinY_(pinY), pinSW_(pinSW), maxIndex_(maxIndex), 
-        selectedItem_(0), debounceMs_(300), debounceTimer_(debounceMs_)
+    Joystick(int pinY, int pinSW, int maxIndex)
+        : pinY_(pinY), pinSW_(pinSW), maxIndex_(maxIndex),
+        selectedItem_(0), debounceMs_(JoystickConfig::SWITCH_DEBOUNCE_MS), debounceTimer_(debounceMs_)
     {
         pinMode(pinSW_, INPUT_PULLUP); // Active-low button
     }
