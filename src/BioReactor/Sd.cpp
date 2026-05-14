@@ -130,3 +130,19 @@ void SdLogger::logValveLocked(int valveId)
 {
   logMessage(String(valveName_(valveId)) + " valve locked");
 }
+
+void SdLogger::logReactorEvent(int reactorId, const char* eventType, unsigned long durationMs)
+{
+  String msg = "R";
+  if (reactorId < 0) msg = "R-";
+  else msg += String(reactorId + 1);
+  msg += ":";
+  msg += eventType;
+  if (durationMs > 0)
+  {
+    msg += " dur=";
+    msg += String(durationMs);
+    msg += "ms";
+  }
+  logMessage(msg);
+}

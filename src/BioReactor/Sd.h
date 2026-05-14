@@ -15,6 +15,7 @@ public:
   void logMessage(const String& message);
   void logValveOn(int valveId);
   void logValveLocked(int valveId);
+  void logReactorEvent(int reactorId, const char* eventType, unsigned long durationMs);
 
 private:
   File dataFile_;

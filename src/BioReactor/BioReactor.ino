@@ -8,6 +8,7 @@
 #include "Timer.h"
 #include "ActionTimer.h"
 #include "Menu.h"
+#include "ReactorController.h"
 
 #define UTC_OFFSET (-7 * 3600)
 
@@ -29,6 +30,7 @@ Mcp mcp;
 Lcd lcd(0x27, &Wire1);
 SdLogger sd;
 Menu menu(&config, phSensors, orpSensors, lcd);
+ReactorController reactorCtrl(mcp, sd);
 
 Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);
@@ -162,6 +164,9 @@ void setup()
   }
 
   sd.logMessage("BOOT");
+
+  menu.setReactorController(&reactorCtrl);
+  reactorCtrl.begin();
 }
 
 void loop()
@@ -186,6 +191,8 @@ void loop()
     sd.logValveOn(openedValve);
     recordValveTrigger(openedValve);
   }
+
+  reactorCtrl.update(config);
 
   if (sdLogTimer.isReady())
     sd.logData(config);

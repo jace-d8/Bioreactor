@@ -10,6 +10,18 @@ namespace PinConfigurations
   const int LCD_PIN_SDA = 6;
   const int LCD_PIN_SCL = 7;
   const int SD_CHIP_SELECT = 21;
+
+  const uint8_t LS_A_PINS[3] = {8, 10, 12};
+  const uint8_t LS_B_PINS[3] = {9, 11, 13};
+}
+
+namespace McpPins
+{
+  const int FV[3]   = {6, 7, 8};
+  const int WV0     = 9;
+  const int WV[3]   = {10, 11, 12};
+  const int FIRST_REACTOR_PIN = 6;
+  const int LAST_REACTOR_PIN  = 12;
 }
 
 namespace Thresholds
@@ -37,10 +49,36 @@ namespace TimingIntervals
   const unsigned long VALVE_TIMER = 10000UL;
 }
 
+namespace ReactorTimings
+{
+  constexpr unsigned long LS_A_CONFIRM_MS  = 500UL;
+  constexpr unsigned long LS_B_CONFIRM_MS  = 1500UL;
+  constexpr unsigned long RECIRC_HOLD_MS   = 60UL * 60UL * 1000UL;
+  constexpr unsigned long FILL_TIMEOUT_MS  = 5000UL;
+  constexpr unsigned long DRAIN_TIMEOUT_MS = 10000UL;
+}
+
 namespace ValveMappings
 {
   const int TOTAL_VALVES = 6;
 }
+
+namespace ReactorMappings
+{
+  const int NUM_REACTORS = 3;
+}
+
+enum class ReactorState : uint8_t
+{
+  Recirculating,
+  WaitingForFill,
+  Filling,
+  Holding,
+  WaitingForDrain,
+  Draining,
+  ErrorLsA,
+  ErrorLsB
+};
 
 struct ConfigState
 {
@@ -48,6 +86,8 @@ struct ConfigState
   bool lcdCleared = false;
   bool blinkState = true;
   bool requestResetErrors = false;
+  bool requestResetLsErrors = false;
+  bool reactorAutoEnabled = true;
 
   bool valveErrorLocked[ValveMappings::TOTAL_VALVES] = {};
 
@@ -56,4 +96,17 @@ struct ConfigState
 
   bool phValid[3] = {};
   bool orpValid[3] = {};
+
+  bool lsA[ReactorMappings::NUM_REACTORS] = {};
+  bool lsB[ReactorMappings::NUM_REACTORS] = {};
+  bool lsAError[ReactorMappings::NUM_REACTORS] = {};
+  bool lsBError[ReactorMappings::NUM_REACTORS] = {};
+  ReactorState reactorState[ReactorMappings::NUM_REACTORS] = {
+    ReactorState::Recirculating,
+    ReactorState::Recirculating,
+    ReactorState::Recirculating
+  };
+  bool fvOpen[ReactorMappings::NUM_REACTORS] = {};
+  bool wvOpen[ReactorMappings::NUM_REACTORS] = {};
+  bool wv0Open = true;
 };

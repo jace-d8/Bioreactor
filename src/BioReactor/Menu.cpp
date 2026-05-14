@@ -1,4 +1,5 @@
 #include "Menu.h"
+#include "ReactorController.h"
 
 
 Menu::Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd)
@@ -15,12 +16,12 @@ Menu::Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& 
 
 void Menu::enter() 
 {
-    if (state_ == MenuState::Off) 
+    if (state_ == MenuState::Off)
     {
         state_ = MenuState::Idle;
         needsFullRedraw_ = true;
         joystick.setSelectedItem(0);
-        joystick.setMaxIndex(2);
+        joystick.setMaxIndex(3);
     }
 }
 
@@ -53,12 +54,22 @@ void Menu::update()
         case MenuState::Valves:
             handleValvesMenu(pressed);
             break;
+        case MenuState::Reactors:
+            handleReactorsMenu(pressed);
+            break;
+        case MenuState::ReactorStatus:
+            handleReactorStatus(pressed);
+            break;
+        case MenuState::ReactorManual:
+            handleReactorManual(pressed);
+            break;
+        case MenuState::Error:
         case MenuState::Off:
             break;
     }
 }
 
-void Menu::draw() 
+void Menu::draw()
 {
     lcd.updateBlink(*config_);
 
@@ -94,6 +105,16 @@ void Menu::draw()
         case MenuState::Valves:
             displayValvesMenu();
             break;
+        case MenuState::Reactors:
+            displayReactorsMenu();
+            break;
+        case MenuState::ReactorStatus:
+            displayReactorStatus();
+            break;
+        case MenuState::ReactorManual:
+            displayReactorManual();
+            break;
+        case MenuState::Error:
         case MenuState::Off:
             break;
     }
@@ -107,7 +128,7 @@ void Menu::handleMainMenu(bool pressed)
 {
     if (!pressed) return;
 
-    switch (joystick.getSelectedItem()) 
+    switch (joystick.getSelectedItem())
     {
         case 0:
             joystick.setSelectedItem(0);
@@ -120,9 +141,14 @@ void Menu::handleMainMenu(bool pressed)
             state_ = MenuState::Valves;
             break;
         case 2:
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(3);
+            state_ = MenuState::Reactors;
+            break;
+        case 3:
             state_ = MenuState::Off;
-            lcd.clear();                 
-            needsFullRedraw_ = true;    
+            lcd.clear();
+            needsFullRedraw_ = true;
             break;
     }
     needsFullRedraw_ = true;
@@ -181,7 +207,7 @@ void Menu::handleProbesMenu(bool pressed)
         // ----- done / back -----
         case MENU_DONE:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(2);
+            joystick.setMaxIndex(3);
             state_ = MenuState::Idle;
             lcd.clear();
             break;
@@ -203,7 +229,7 @@ void Menu::handleValvesMenu(bool pressed)
             break;
         case 2:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(2);
+            joystick.setMaxIndex(3);
             state_ = MenuState::Idle;
             break;
     }
@@ -265,33 +291,36 @@ void Menu::handleORPSelection(bool pressed)
     needsFullRedraw_ = true;
 }
 
-void Menu::displayMainMenu() 
+void Menu::displayMainMenu()
 {
-    if (needsFullRedraw_) 
+    if (needsFullRedraw_)
     {
         lcd.clear();
         lcd.setCursor(COL_LEFT, ROW_TITLE);
         lcd.print("MAIN MENU");
         lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Calibrate Probes");
         lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Valve Control");
-        lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Exit");
+        lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Reactors");
+        lcd.setCursor(COL_FAR_RIGHT, ROW_3); lcd.print("Exit");
     }
 
-    if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem()) 
+    if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem())
     {
-        switch (lastSelectedItem_) 
+        switch (lastSelectedItem_)
         {
             case 0: lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Calibrate Probes"); break;
             case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Valve Control   "); break;
-            case 2: lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Exit            "); break;
+            case 2: lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Reactors"); break;
+            case 3: lcd.setCursor(COL_FAR_RIGHT, ROW_3); lcd.print("Exit"); break;
         }
     }
 
-    switch (joystick.getSelectedItem()) 
+    switch (joystick.getSelectedItem())
     {
         case 0: printMenuItem(COL_LEFT, ROW_1, "Calibrate Probes", 0); break;
         case 1: printMenuItem(COL_LEFT, ROW_2, "Valve Control",    1); break;
-        case 2: printMenuItem(COL_LEFT, ROW_3, "Exit",             2); break;
+        case 2: printMenuItem(COL_LEFT, ROW_3, "Reactors",         2); break;
+        case 3: printMenuItem(COL_FAR_RIGHT, ROW_3, "Exit",        3); break;
     }
 }
 
@@ -467,9 +496,189 @@ void Menu::printMenuItem(int col, int row, const char* label, int itemIndex)
     if (itemIndex == joystick.getSelectedItem() && config_->blinkState) 
     {
         for (int i = 0; i < (int)strlen(label); ++i) lcd.print(' ');
-    } 
-    else 
+    }
+    else
     {
         lcd.print(label);
     }
+}
+
+static const char* reactorStateName(ReactorState s)
+{
+    switch (s)
+    {
+        case ReactorState::Recirculating:   return "RECIRC";
+        case ReactorState::WaitingForFill:  return "Q-FILL";
+        case ReactorState::Filling:         return "FILL  ";
+        case ReactorState::Holding:         return "HOLD  ";
+        case ReactorState::WaitingForDrain: return "Q-DRN ";
+        case ReactorState::Draining:        return "DRAIN ";
+        case ReactorState::ErrorLsA:        return "ERR-A ";
+        case ReactorState::ErrorLsB:        return "ERR-B ";
+    }
+    return "?     ";
+}
+
+void Menu::handleReactorsMenu(bool pressed)
+{
+    if (!pressed) return;
+    switch (joystick.getSelectedItem())
+    {
+        case 0:
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(0);
+            state_ = MenuState::ReactorStatus;
+            break;
+        case 1:
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(7);
+            state_ = MenuState::ReactorManual;
+            break;
+        case 2:
+            if (reactorCtrl_) reactorCtrl_->resetLsErrors(*config_);
+            config_->requestResetLsErrors = false;
+            break;
+        case 3:
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(3);
+            state_ = MenuState::Idle;
+            break;
+    }
+    needsFullRedraw_ = true;
+}
+
+void Menu::handleReactorStatus(bool pressed)
+{
+    if (!pressed) return;
+    joystick.setSelectedItem(0);
+    joystick.setMaxIndex(3);
+    state_ = MenuState::Reactors;
+    needsFullRedraw_ = true;
+}
+
+void Menu::handleReactorManual(bool pressed)
+{
+    if (!pressed) return;
+    int sel = joystick.getSelectedItem();
+    if (!reactorCtrl_)
+    {
+        if (sel == 7) { joystick.setSelectedItem(0); joystick.setMaxIndex(3); state_ = MenuState::Reactors; }
+        needsFullRedraw_ = true;
+        return;
+    }
+    if (sel >= 0 && sel <= 2)
+    {
+        bool nowOn = !config_->fvOpen[sel];
+        reactorCtrl_->manualOverrideFv(sel, nowOn);
+    }
+    else if (sel == 3)
+    {
+        reactorCtrl_->manualOverrideWv0(!config_->wv0Open);
+    }
+    else if (sel >= 4 && sel <= 6)
+    {
+        int r = sel - 4;
+        bool nowOn = !config_->wvOpen[r];
+        reactorCtrl_->manualOverrideWv(r, nowOn);
+    }
+    else if (sel == 7)
+    {
+        joystick.setSelectedItem(0);
+        joystick.setMaxIndex(3);
+        state_ = MenuState::Reactors;
+    }
+    needsFullRedraw_ = true;
+}
+
+void Menu::displayReactorsMenu()
+{
+    if (needsFullRedraw_)
+    {
+        lcd.clear();
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("REACTORS");
+        lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Status");
+        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Manual Valves");
+        lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Reset LS Err");
+        lcd.setCursor(COL_FAR_RIGHT, ROW_3); lcd.print("Back");
+    }
+
+    if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem())
+    {
+        switch (lastSelectedItem_)
+        {
+            case 0: lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Status       "); break;
+            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Manual Valves"); break;
+            case 2: lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Reset LS Err"); break;
+            case 3: lcd.setCursor(COL_FAR_RIGHT, ROW_3); lcd.print("Back"); break;
+        }
+    }
+
+    switch (joystick.getSelectedItem())
+    {
+        case 0: printMenuItem(COL_LEFT, ROW_1, "Status",       0); break;
+        case 1: printMenuItem(COL_LEFT, ROW_2, "Manual Valves", 1); break;
+        case 2: printMenuItem(COL_LEFT, ROW_3, "Reset LS Err",  2); break;
+        case 3: printMenuItem(COL_FAR_RIGHT, ROW_3, "Back",     3); break;
+    }
+}
+
+void Menu::displayReactorStatus()
+{
+    lcd.setCursor(COL_LEFT, ROW_TITLE);
+    lcd.print("R# STATE  A B FV WV");
+
+    for (int i = 0; i < ReactorMappings::NUM_REACTORS; ++i)
+    {
+        lcd.setCursor(COL_LEFT, ROW_1 + i);
+        lcd.print(i + 1);
+        lcd.print(' ');
+        lcd.print(reactorStateName(config_->reactorState[i]));
+        lcd.print(' ');
+        lcd.print(config_->lsA[i] ? '1' : '0');
+        lcd.print(' ');
+        lcd.print(config_->lsB[i] ? '1' : '0');
+        lcd.print(' ');
+        lcd.print(config_->fvOpen[i] ? '1' : '0');
+        lcd.print(' ');
+        lcd.print(config_->wvOpen[i] ? '1' : '0');
+    }
+}
+
+void Menu::displayReactorManual()
+{
+    if (needsFullRedraw_)
+    {
+        lcd.clear();
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("MANUAL VALVES");
+    }
+
+    const char* labels[8] = {"FV1", "FV2", "FV3", "WV0", "WV1", "WV2", "WV3", "Back"};
+    bool states[7] = {
+        config_->fvOpen[0], config_->fvOpen[1], config_->fvOpen[2],
+        config_->wv0Open,
+        config_->wvOpen[0], config_->wvOpen[1], config_->wvOpen[2]
+    };
+
+    for (int i = 0; i < 7; ++i)
+    {
+        int col = (i % 4) * 5;
+        int row = ROW_1 + (i / 4);
+        lcd.setCursor(col, row);
+        if (i == joystick.getSelectedItem() && config_->blinkState)
+        {
+            lcd.print("     ");
+        }
+        else
+        {
+            lcd.print(labels[i]);
+            lcd.print(states[i] ? '+' : '-');
+            lcd.print(' ');
+        }
+    }
+
+    lcd.setCursor(COL_FAR_RIGHT, ROW_3);
+    if (joystick.getSelectedItem() == 7 && config_->blinkState)
+        lcd.print("    ");
+    else
+        lcd.print("Back");
 }

@@ -1,4 +1,5 @@
 #include "Mcp.h"
+#include "Config.h"
 #include "Timer.h"
 
 Timer queueTimer(12000);
@@ -11,8 +12,21 @@ bool Mcp::begin()
   for (int i = 0; i < 6; ++i)
     mcp_.pinMode(i, OUTPUT);
 
+  for (int i = McpPins::FIRST_REACTOR_PIN; i <= McpPins::LAST_REACTOR_PIN; ++i)
+  {
+    mcp_.pinMode(i, OUTPUT);
+    mcp_.digitalWrite(i, LOW);
+  }
+
+  mcp_.digitalWrite(McpPins::WV0, HIGH);
+
   resetState(nullptr);
   return true;
+}
+
+void Mcp::setPin(int pin, bool high)
+{
+  mcp_.digitalWrite(pin, high ? HIGH : LOW);
 }
 
 bool Mcp::enqueue(int valveId)

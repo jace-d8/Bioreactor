@@ -10,6 +10,7 @@ public:
   bool enqueue(int valveId);
   int update(bool queued[]);
   void resetState(bool queued[]);
+  void setPin(int pin, bool high);
 
 private:
   Adafruit_MCP23X17 mcp_;

@@ -5,6 +5,8 @@
 #include "Joystick.h"
 #include "Timer.h"
 
+class ReactorController;
+
 struct MenuItem {
     int col;
     int row;
@@ -41,8 +43,10 @@ private:
     Lcd& lcd;
 
     // Menu state
-    enum class MenuState { Idle, Calibrating, Valves, PhCalibration, OrpCalibration, Error, Off };
+    enum class MenuState { Idle, Calibrating, Valves, PhCalibration, OrpCalibration, Error, Off,
+                           Reactors, ReactorStatus, ReactorManual };
     MenuState state_ = MenuState::Off;
+    ReactorController* reactorCtrl_ = nullptr;
 
     // Calibration progress
     bool bufferCalibrated_[3][3] = {
@@ -76,6 +80,7 @@ private:
 
 public:
     Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd);
+    void setReactorController(ReactorController* rc) { reactorCtrl_ = rc; }
     void enter();
     void update();
     void draw();
@@ -90,6 +95,9 @@ private:
     void handleValvesMenu(bool pressed);
     void handlePhCalibrationSelection(bool pressed);
     void handleORPSelection(bool pressed);
+    void handleReactorsMenu(bool pressed);
+    void handleReactorStatus(bool pressed);
+    void handleReactorManual(bool pressed);
 
     // Screens
     void displayMainMenu();
@@ -97,6 +105,9 @@ private:
     void displayValvesMenu();
     void displayPhMenu();
     void displayORPCalibrationMenu();
+    void displayReactorsMenu();
+    void displayReactorStatus();
+    void displayReactorManual();
 
     // Helpers
     bool allPHBuffersCalibrated();
