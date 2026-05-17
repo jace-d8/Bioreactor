@@ -182,5 +182,5 @@ Open [`src/BioReactor/BioReactor.ino`](src/BioReactor/BioReactor.ino) in the Ard
 ---
 
 Jace Dunn  
-HYPER, WSU  
+Kuangs Biotech Group, WSU  
 jace.dunn@wsu.edu
