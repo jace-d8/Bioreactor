@@ -178,3 +178,9 @@ In the Arduino IDE, under **Tools**, set Pin Numbering to **"By GPIO number (leg
 ## Building
 
 Open [`src/BioReactor/BioReactor.ino`](src/BioReactor/BioReactor.ino) in the Arduino IDE, select the Arduino Nano ESP32 board, set the pin numbering option above, and upload.
+
+---
+
+Jace Dunn  
+HYPER, WSU  
+jace.dunn@wsu.edu
