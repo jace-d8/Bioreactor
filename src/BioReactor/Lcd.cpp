@@ -58,6 +58,11 @@ void Lcd::print(const char* text)
     lcd_.print(text);
 }
 
+void Lcd::print(int val)
+{
+    lcd_.print(val);
+}
+
 void Lcd::print(const String& text)
 {
     lcd_.print(text);

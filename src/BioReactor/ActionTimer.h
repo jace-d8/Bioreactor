@@ -1,3 +1,5 @@
+#pragma once
+
 class ActionTimer {
 public:
   ActionTimer(unsigned long durationMs)

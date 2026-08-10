@@ -22,6 +22,7 @@ public:
     }
 
     void move();
+    int yAxisStep();
     bool isPressed();
 
     int getSelectedItem() const;

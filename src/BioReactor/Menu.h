@@ -30,10 +30,13 @@ enum PhCalibrationIndices {
     BUFFER_DONE
 };
 
+class SdLogger;
+
 class Menu {
 private:
     // Core state / deps
     ConfigState* config_;
+    SdLogger* sd_;
     EzoBoard* phSensors_[3];   
     EzoBoard* orpSensors_[3]; 
     int activePh_;            
@@ -41,15 +44,19 @@ private:
     Lcd& lcd;
 
     // Menu state
-    enum class MenuState { Idle, Calibrating, Valves, PhCalibration, OrpCalibration, Error, Off };
+    enum class MenuState { Idle, Settings, Valves, Thresholds, Calibrating, PhCalibration, OrpCalibration, Error, Off };
     MenuState state_ = MenuState::Off;
 
-    // Calibration progress
-    bool bufferCalibrated_[3][3] = {
-    { false, false, false },   // probe 1
-    { false, false, false },   // probe 2
-    { false, false, false }    // probe 3
+    enum class ThresholdEdit {
+        None,
+        Ph,        // pH minimum
+        Orp,       // ORP minimum
+        PhMaxTrig, // pH valve trigger limit (per hour)
+        OrpMaxTrig,// ORP valve trigger limit (per hour)
+        PhValveT,  // pH valve open duration (seconds)
+        OrpValveT  // ORP valve open duration (seconds)
     };
+    ThresholdEdit thresholdEdit_ = ThresholdEdit::None;
 
     int lastSelectedItem_ = -1;
     MenuState lastDrawnState_ = MenuState::Off;
@@ -75,30 +82,37 @@ private:
     };
 
 public:
-    Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd);
+    Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd, SdLogger& sd);
     void enter();
     void update();
     void draw();
     void displayError(const String& error);
     bool isActive() const { return state_ != MenuState::Off; }
-    Joystick joystick{PinConfigurations::PIN_Y, PinConfigurations::PIN_SW, MENU_DONE}; // move back to private and make getter
+    Joystick joystick{PinConfigurations::PIN_Y, PinConfigurations::PIN_SW, MENU_DONE};
 
 private:
     // Flow handlers
     void handleMainMenu(bool pressed);
+    void handleSettingsMenu(bool pressed);
     void handleProbesMenu(bool pressed);
     void handleValvesMenu(bool pressed);
+    void handleThresholdsMenu(bool pressed);
+    void adjustThresholdFromJoystick();
     void handlePhCalibrationSelection(bool pressed);
     void handleORPSelection(bool pressed);
 
     // Screens
     void displayMainMenu();
+    void displaySettingsMenu();
     void displayProbesMenu();
     void displayValvesMenu();
+    void displayThresholdsMenu();
     void displayPhMenu();
     void displayORPCalibrationMenu();
 
     // Helpers
     bool allPHBuffersCalibrated();
     void printMenuItem(int col, int row, const char* label, int itemIndex);
+    bool persistPhBufferCalibration(int bufferIdx);
+    bool persistOrpCalibration();
 };

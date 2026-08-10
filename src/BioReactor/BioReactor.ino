@@ -13,27 +13,27 @@
 
 ConfigState config;
 
-EzoBoard orpSensors[3] = {  //set up ORP sensors (3 probes)//
+EzoBoard orpSensors[3] = {//set up ORP sensors (3 probes)//
   EzoBoard(EzoAddresses::ORP[0], "ORP"),
   EzoBoard(EzoAddresses::ORP[1], "ORP"),
   EzoBoard(EzoAddresses::ORP[2], "ORP")
 };
 
-EzoBoard phSensors[3] = {  //set up pH sensors (3 probes)//
+EzoBoard phSensors[3] = {//set up pH sensors (3 probes)//
   EzoBoard(EzoAddresses::PH[0], "pH"),
   EzoBoard(EzoAddresses::PH[1], "pH"),
   EzoBoard(EzoAddresses::PH[2], "pH")
 };
 
-Mcp mcp;  //set up MCP (Multi-Channel Protocol) controller (used to control the valves)//
-Lcd lcd(0x27, &Wire1);  //set up LCD display (I2C address 0x27, using Wire1 for I2C communication) (used to display the data)//
-SdLogger sd;  //set up SD card logger//
-Menu menu(&config, phSensors, orpSensors, lcd);  //set up menu (configuration, pH sensors, ORP sensors, LCD display)//
+Mcp mcp;//set up MCP controller (controls the valves)//
+Lcd lcd(0x27, &Wire1);//set up LCD display//
+SdLogger sd;//set up SD card logger//
+Menu menu(&config, phSensors, orpSensors, lcd, sd);
 
-Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);  //set up probe read timer (*2 seconds)//
-Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);  //set up SD log timer (*2 seconds)//
+Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);//*2 s between probe reads//
+Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);//*2 s between SD card logs//
 
-bool queued[ValveMappings::TOTAL_VALVES] = { false };  //queued[i] - "valve i is already in the MCP queue waiting to open." Prevents double-queueing.//
+bool queued[ValveMappings::TOTAL_VALVES] = { false };//valve already in queue guard//
 
 ActionTimer cooldown[ValveMappings::TOTAL_VALVES] = {
   ActionTimer(TimingIntervals::VALVE_COOLDOWN),
@@ -42,160 +42,255 @@ ActionTimer cooldown[ValveMappings::TOTAL_VALVES] = {
   ActionTimer(TimingIntervals::VALVE_COOLDOWN),
   ActionTimer(TimingIntervals::VALVE_COOLDOWN),
   ActionTimer(TimingIntervals::VALVE_COOLDOWN)
-};  //One 60 s cooldown timer per valve; started when a valve is queued.//
-//History of open times for error-locking (too many opens in *1 hour).//
-unsigned long valveTriggerTimes[ValveMappings::TOTAL_VALVES][TimingIntervals::MAX_VALVE_ERROR_HISTORY] = {};  //Timestamp of each valve trigger in the last *1 hour.//
-int valveTriggerCounts[ValveMappings::TOTAL_VALVES] = {};  //Count of valve triggers in the last *1 hour.//
+};//One 60 s cooldown timer per valve; started when a valve is queued.//
 
+// ── Dwell timers ──────────────────────────────────────────────────────────────
+// Each valve gets its own ActionTimer.  The timer is started (or kept running)
+// while the reading is below the threshold, and reset as soon as the reading
+// rises above it.  A valve is only queued once the dwell timer has expired,
+// i.e. the reading has been continuously below threshold for at least
+// TimingIntervals::VALVE_BELOW_THRESHOLD_MS milliseconds.
+ActionTimer dwellTimer[ValveMappings::TOTAL_VALVES] = {
+  ActionTimer(TimingIntervals::VALVE_BELOW_THRESHOLD_MS),
+  ActionTimer(TimingIntervals::VALVE_BELOW_THRESHOLD_MS),
+  ActionTimer(TimingIntervals::VALVE_BELOW_THRESHOLD_MS),
+  ActionTimer(TimingIntervals::VALVE_BELOW_THRESHOLD_MS),
+  ActionTimer(TimingIntervals::VALVE_BELOW_THRESHOLD_MS),
+  ActionTimer(TimingIntervals::VALVE_BELOW_THRESHOLD_MS)
+};
+
+// Tracks whether each valve's dwell timer is currently running (started but
+// not yet done).  Prevents re-starting the timer on every loop iteration.
+bool dwellRunning[ValveMappings::TOTAL_VALVES] = { false };
+
+//History of open times for error-locking (too many opens in *1 hour).//
+unsigned long valveTriggerTimes[ValveMappings::TOTAL_VALVES][TimingIntervals::MAX_VALVE_ERROR_HISTORY] = {};
+int valveTriggerCounts[ValveMappings::TOTAL_VALVES] = {};
+
+// ── tryQueueValve ─────────────────────────────────────────────────────────────
+// condition = true  → reading is below threshold right now.
+// A valve is only actually queued once the dwell timer says the reading has
+// been below threshold for at least VALVE_BELOW_THRESHOLD_MS continuously.
 bool tryQueueValve(int valveId, bool condition)
 {
-  if (!condition) return false;  //If the sensor/threshold test is false, exit — do nothing.//
-  if (config.valvesDisabled) return false;  //If the user turned valves off in the menu, exit.//
-  if (queued[valveId]) return false;  //If this valve is already waiting in the queue, exit (no duplicate).//
-  if (config.valveErrorLocked[valveId]) return false;  //If this valve was error-locked (too many triggers), exit.//
-  if (!cooldown[valveId].done()) return false;  //If the 60 s cooldown from the last queue is still running, exit.//
-  if (!mcp.enqueue(valveId)) return false;  //Push valveId onto the MCP’s FIFO queue (fails if queue already has *6 items).//
+  if (!condition)
+  {
+    // Reading is fine — reset the dwell timer so the clock starts fresh
+    // if it dips below threshold again later.
+    dwellTimer[valveId].stop();
+    dwellRunning[valveId] = false;
+    return false;
+  }
 
-  cooldown[valveId].start();  //Start the *60 s cooldown (even though the valve may not open for up to *~12 s).//
-  queued[valveId] = true;  //Mark this valve as “pending” so line 54 blocks re-queueing.//
-  return true;  //Return true = successfully queued (not opened yet).//
+  // Reading is below threshold.  Kick off the dwell timer on the first
+  // low reading.  dwellRunning[] tracks whether we have already called
+  // start() so we do not reset a running timer on every loop iteration.
+  if (!dwellRunning[valveId])
+  {
+    dwellTimer[valveId].start();
+    dwellRunning[valveId] = true;
+  }
+
+  // Not yet held below threshold long enough.
+  if (!dwellTimer[valveId].done()) return false;
+
+  // Dwell satisfied — now apply the usual guards.
+  if (config.valvesDisabled)               return false;
+  if (queued[valveId])                     return false;
+  if (config.valveErrorLocked[valveId])    return false;
+  if (!cooldown[valveId].done())
+  {
+    // Cooldown still running — reset dwell so the 5 s must elapse
+    // again from scratch once the cooldown is over.
+    dwellTimer[valveId].stop();
+    dwellRunning[valveId] = false;
+    return false;
+  }
+  if (!mcp.enqueue(valveId))               return false;
+
+  cooldown[valveId].start();
+  queued[valveId] = true;
+
+  // Reset dwell so the timer must expire again for the next trigger.
+  dwellTimer[valveId].stop();
+  dwellRunning[valveId] = false;
+
+  return true;
 }
 
-void recordValveTrigger(int valveId)  //Record the valve trigger in the error-locking history.//
+// ── recordValveTrigger ────────────────────────────────────────────────────────
+void recordValveTrigger(int valveId)
 {
-  int &count = valveTriggerCounts[valveId];  //Count of valve triggers in the last *1 hour.//
+  int& count = valveTriggerCounts[valveId];
 
-  if (count < TimingIntervals::MAX_VALVE_ERROR_HISTORY)  //If the count is less than the max error history, add the current time to the trigger times array.//
+  if (count < TimingIntervals::MAX_VALVE_ERROR_HISTORY)
   {
-    valveTriggerTimes[valveId][count++] = millis();  //Add the current time to the trigger times array.//
+    valveTriggerTimes[valveId][count++] = millis();
   }
-  else  //If the count is greater than the max error history, shift the trigger times array to the left and add the current time to the trigger times array.//
+  else
   {
     for (int i = 1; i < TimingIntervals::MAX_VALVE_ERROR_HISTORY; ++i)
-      valveTriggerTimes[valveId][i - 1] = valveTriggerTimes[valveId][i];   //Shift the trigger times array to the left.//
-
-    valveTriggerTimes[valveId][TimingIntervals::MAX_VALVE_ERROR_HISTORY - 1] = millis();  //Add the current time to the trigger times array.//
+      valveTriggerTimes[valveId][i - 1] = valveTriggerTimes[valveId][i];
+    valveTriggerTimes[valveId][TimingIntervals::MAX_VALVE_ERROR_HISTORY - 1] = millis();
   }
 
-  const bool isPhValve = (valveId % 2 == 0);  //Check if the valve is a pH valve.//
-  const int limit = isPhValve
-    ? TimingIntervals::PH_VALVE_TRIGGER_LIMIT  //If the valve is a pH valve, use the pH valve trigger limit.//
-    : TimingIntervals::ORP_VALVE_TRIGGER_LIMIT;  //If the valve is an ORP valve, use the ORP valve trigger limit.//
+  // Use runtime-editable limits from ConfigState.
+  const bool isPh  = (valveId % 2 == 0);
+  const int  limit = isPh ? config.phMaxTrig : config.orpMaxTrig;
 
-  if (count >= limit)  //If the count is greater than or equal to the limit, check if the valve has been error-locked.//
+  // Select the error window for the valve type being checked.
+  // pH and ORP now have independent windows defined in Config.h so they
+  // can be tuned separately without affecting each other.
+  const unsigned long errorWindow = isPh
+    ? TimingIntervals::PH_VALVE_ERROR_WINDOW
+    : TimingIntervals::ORP_VALVE_ERROR_WINDOW;
+
+  if (count >= limit)
   {
-    unsigned long oldest = valveTriggerTimes[valveId][count - limit];  //Get the oldest trigger time.//
-    if (millis() - oldest < TimingIntervals::VALVE_ERROR_WINDOW)  //If the oldest trigger time is less than the error window, error-lock the valve.//
+    unsigned long oldest = valveTriggerTimes[valveId][count - limit];
+    if (millis() - oldest < errorWindow)
     {
-      if (!config.valveErrorLocked[valveId])  //If the valve is not already error-locked, error-lock the valve.//
+      if (!config.valveErrorLocked[valveId])
       {
-        config.valveErrorLocked[valveId] = true;  //Set the valve error locked flag to true.//
-        sd.logValveLocked(valveId);  //Log the valve error to the SD card.//
+        config.valveErrorLocked[valveId] = true;
+        sd.logValveLocked(valveId);
       }
     }
   }
 }
 
-void resetValveErrors()  //Reset the valve error-locking history.//
+// ── resetValveErrors ──────────────────────────────────────────────────────────
+void resetValveErrors()
 {
-  for (int i = 0; i < ValveMappings::TOTAL_VALVES; ++i)  //Reset the valve error-locking history for all valves.//
+  for (int i = 0; i < ValveMappings::TOTAL_VALVES; ++i)
   {
-    config.valveErrorLocked[i] = false;  //Set the valve error locked flag to false.//
-    valveTriggerCounts[i] = 0;  //Set the valve trigger count to 0.//
-    queued[i] = false;  //Set the valve queued flag to false, so that it can be queued again.//
+    config.valveErrorLocked[i] = false;
+    valveTriggerCounts[i]      = 0;
+    queued[i]                  = false;
+    dwellTimer[i].stop();
+    dwellRunning[i]            = false;
+    // Stop the cooldown so valves can re-trigger immediately after a reset.
+    // ActionTimer::done() returns true when not running, so stop() is all
+    // that is needed — no separate "clear" is required.
+    cooldown[i].stop();
 
-    for (int j = 0; j < TimingIntervals::MAX_VALVE_ERROR_HISTORY; ++j)  //Reset the trigger times array for all valves.//
-      valveTriggerTimes[i][j] = 0;  //Set the trigger times array to 0.//
+    for (int j = 0; j < TimingIntervals::MAX_VALVE_ERROR_HISTORY; ++j)
+      valveTriggerTimes[i][j] = 0;
   }
 
-  mcp.resetState(queued);  //Reset the MCP state.//
-
-  config.requestResetErrors = false;  //Set the request reset errors flag to false.//
+  mcp.resetState(queued);
+  config.requestResetErrors = false;
 }
 
-void handleProbeReads()  //Handle the probe reads and update the LCD.//
+// ── handleProbeReads ──────────────────────────────────────────────────────────
+void handleProbeReads()
 {
-  for (int i = 0; i < 3; ++i)  //Read the pH and ORP values from all 3 probes.//
+  for (int i = 0; i < 3; ++i)
   {
-    config.phValues[i] = phSensors[i].read();  //Read the pH value from the probe.//
-    config.orpValues[i] = orpSensors[i].read();  //Read the ORP value from the probe.//
-
-    config.phValid[i] = phSensors[i].hasValidReading();  //Check if the pH value is valid.//
-    config.orpValid[i] = orpSensors[i].hasValidReading();  //Check if the ORP value is valid.//
+    config.phValues[i]  = phSensors[i].read();
+    config.orpValues[i] = orpSensors[i].read();
+    config.phValid[i]   = phSensors[i].hasValidReading();
+    config.orpValid[i]  = orpSensors[i].hasValidReading();
   }
 
-  if (!config.lcdCleared)  //If the LCD is not cleared, clear it.//
+  if (!config.lcdCleared)
   {
-    lcd.clear();  //Clear the LCD.//
-    config.lcdCleared = true;  //Set the LCD cleared flag to true.//
+    lcd.clear();
+    config.lcdCleared = true;
   }
 
-  if (!menu.isActive())  //If the menu is not active, print the data to the LCD.//
-    lcd.printData(config);  //Print the data to the LCD.//
+  if (!menu.isActive())
+  {
+    lcd.printData(config);
+
+    // ROW_3 is not used by printData (which only writes rows 0-2), so it is
+    // safe to write here without disrupting the main display.
+    // The message is padded to 20 characters to overwrite any stale content
+    // from a previous state (e.g. a menu screen that wrote to this row).
+    lcd.setCursor(COL_LEFT, ROW_3);
+    lcd.print(sd.isHealthy() ? "                    " : "SD ERR - CHECK CARD ");
+  }
 }
 
-void setup()  //Setup the hardware and software.//
+// ── setup ─────────────────────────────────────────────────────────────────────
+void setup()
 {
-  Wire.begin();  //Initialize the I2C bus.//
-  Wire.setClock(BusSpeeds::I2C_HZ);  //Set the I2C bus speed.//
+  Wire.begin();
+  Wire.setClock(BusSpeeds::I2C_HZ);
+  // Release the bus automatically if any I2C transaction stalls for more than
+  // 50 ms.  Without this, a locked-up EZO board (SDA held low due to bus
+  // loading or a defective board) would block Wire.requestFrom() indefinitely
+  // and trigger the ESP32 task watchdog — the same failure mode as an SD card
+  // garbage-collection stall.  The second argument (true) resets the bus on
+  // timeout so subsequent transactions can proceed normally.
+  Wire.setTimeout(50);  // 50 ms in microseconds
 
-  Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, BusSpeeds::I2C_HZ);  //Initialize the LCD display (I2C address 0x27, using Wire1 for I2C communication).//
+  Wire1.begin(PinConfigurations::LCD_PIN_SDA, PinConfigurations::LCD_PIN_SCL, BusSpeeds::I2C_HZ);
 
-  const bool mcpReady = mcp.begin();  //Check if the MCP is ready.//
+  const bool mcpReady = mcp.begin();
 
-  lcd.init();  //Initialize the LCD display.//
+  lcd.init();
 
-  SPI.begin();  //Initialize the SPI bus.//
+  SPI.begin();
 
-  configTime(UTC_OFFSET, 0, "");  //Set the time from the internet.//
+  configTime(UTC_OFFSET, 0, "");
 
-  const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT, BusSpeeds::SD_SPI_HZ);  //Check if the SD card is ready.//
-  sd.setTimeFromBuild();  //Set the time from the build date.//
+  const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT, BusSpeeds::SD_SPI_HZ);
+  sd.setTimeFromBuild();
 
-  if (!mcpReady || !sdReady)  //If the MCP or SD card is not ready, print an error message to the LCD.//
+  if (!mcpReady || !sdReady)
   {
-    lcd.clear();  //Clear the LCD.//
-    lcd.setCursor(COL_LEFT, ROW_TITLE);  //Set the cursor to the left column and the title row.//
-    lcd.print(!mcpReady ? "MCP init failed" : "SD init failed");  //Print the MCP init failed message to the LCD.//
-    lcd.setCursor(COL_LEFT, ROW_1);  //Set the cursor to the left column and the first row.//
-    lcd.print(!mcpReady && !sdReady ? "SD init failed" : "Check wiring");  //Print the SD init failed message to the LCD.//
+    lcd.clear();
+    lcd.setCursor(COL_LEFT, ROW_TITLE);
+    lcd.print(!mcpReady ? "MCP init failed" : "SD init failed");
+    lcd.setCursor(COL_LEFT, ROW_1);
+    lcd.print(!mcpReady && !sdReady ? "SD init failed" : "Check wiring");
   }
-
-  sd.logMessage("BOOT");  //Log the boot message to the SD card.//
+  else
+  {
+    sd.restoreCalibrations(phSensors, orpSensors, config);
+    sd.logMessage("BOOT");
+  }
 }
 
-void loop()  //Main loop.//
+// ── loop ──────────────────────────────────────────────────────────────────────
+void loop()
 {
   if (probeTimer.isReady())
-    handleProbeReads();  //Reads and validates pH/ORP data from all 3 probes, updates the LCD, and clears the LCD if needed.Every *2 seconds.//
+    handleProbeReads();
 
   if (config.requestResetErrors)
-    resetValveErrors();  //Clears locks, queued[], trigger history, and the MCP queue (from the menu).//
+    resetValveErrors();
 
-  tryQueueValve(0, config.phValid[0] && config.phValues[0] < Thresholds::PH_MINIMUM);
-  tryQueueValve(2, config.phValid[1] && config.phValues[1] < Thresholds::PH_MINIMUM);
-  tryQueueValve(4, config.phValid[2] && config.phValues[2] < Thresholds::PH_MINIMUM);
+  // pH valves: ids 0, 2, 4
+  tryQueueValve(0, config.phValid[0] && config.phValues[0] < config.phMinimum);
+  tryQueueValve(2, config.phValid[1] && config.phValues[1] < config.phMinimum);
+  tryQueueValve(4, config.phValid[2] && config.phValues[2] < config.phMinimum);
 
-  tryQueueValve(1, config.orpValid[0] && config.orpValues[0] < Thresholds::ORP_MINIMUM);
-  tryQueueValve(3, config.orpValid[1] && config.orpValues[1] < Thresholds::ORP_MINIMUM);
-  tryQueueValve(5, config.orpValid[2] && config.orpValues[2] < Thresholds::ORP_MINIMUM);
+  // ORP valves: ids 1, 3, 5
+  tryQueueValve(1, config.orpValid[0] && config.orpValues[0] < config.orpMinimum);
+  tryQueueValve(3, config.orpValid[1] && config.orpValues[1] < config.orpMinimum);
+  tryQueueValve(5, config.orpValid[2] && config.orpValues[2] < config.orpMinimum);
 
-  int openedValve = mcp.update(queued);
-  if (openedValve >= 0)  //If a valve was opened, log the event and record the trigger.//
+  // Pass runtime valve-timer durations so the MCP uses the latest menu values.
+  // opened[] receives every valve id opened this cycle (up to 2: one pH, one ORP).
+  int opened[2];
+  int openedCount = mcp.update(queued, config.phValveTimerSec, config.orpValveTimerSec, opened);
+  for (int i = 0; i < openedCount; ++i)
   {
-    sd.logValveOn(openedValve);  //Log the valve open event to the SD card.//
-    recordValveTrigger(openedValve);  //Record the valve trigger in the error-locking history.//
+    sd.logValveOn(opened[i]);
+    recordValveTrigger(opened[i]);
   }
 
   if (sdLogTimer.isReady())
-    sd.logData(config);  //Log the current configuration data to the SD card every *10 seconds.//
+    sd.logData(config);
 
   if (!menu.isActive() && menu.joystick.isPressed())
-    menu.enter();  //Enter the menu if the joystick is pressed and the menu is not active.//
+    menu.enter();
 
-  if (menu.isActive())  //If the menu is active, update and draw the menu.//
+  if (menu.isActive())
   {
-    menu.update();  //Update the menu.//
-    menu.draw();  //Draw the menu.//
+    menu.update();
+    menu.draw();
   }
 }

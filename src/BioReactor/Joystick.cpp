@@ -25,6 +25,25 @@ void Joystick::move()
     }
 }
 
+int Joystick::yAxisStep()
+{
+    const int yVal = analogRead(pinY_);
+    const int center = JoystickConfig::ANALOG_CENTER;
+    const int deadZone = JoystickConfig::ANALOG_DEADZONE;
+
+    if (yVal < center - deadZone)
+    {
+        delay(JoystickConfig::SCROLL_DELAY_MS);
+        return -1;
+    }
+    if (yVal > center + deadZone)
+    {
+        delay(JoystickConfig::SCROLL_DELAY_MS);
+        return 1;
+    }
+    return 0;
+}
+
 bool Joystick::isPressed()
 {
     bool pressed = !digitalRead(pinSW_); // Active low

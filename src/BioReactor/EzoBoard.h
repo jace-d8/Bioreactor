@@ -19,7 +19,10 @@ public:
   float read();
   bool hasValidReading() const { return valid_; }
 
-  void sendCmd(String cmd);
+  void sendCmd(const char* cmd);
+  bool exportCalibration(char* out, size_t outLen);
+  bool importCalibration(const char* payload);
+  void resetReadState();
 
 
   void setTemperature(float tempC);

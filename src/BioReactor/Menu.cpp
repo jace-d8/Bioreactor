@@ -1,8 +1,9 @@
 #include "Menu.h"
+#include "Sd.h"
 
 
-Menu::Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd)
-    : config_(config), lcd(lcd)
+Menu::Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd, SdLogger& sd)
+    : config_(config), sd_(&sd), lcd(lcd)
 {
     for (int i = 0; i < 3; i++)
     {
@@ -29,7 +30,10 @@ void Menu::update()
     const bool pressed = joystick.isPressed();
     const int before = joystick.getSelectedItem();
 
-    if (!pressed)
+    const bool allowMenuScroll =
+        state_ != MenuState::Thresholds || thresholdEdit_ == ThresholdEdit::None;
+
+    if (!pressed && allowMenuScroll)
     {
         joystick.move();
         if (joystick.getSelectedItem() != before)
@@ -50,8 +54,22 @@ void Menu::update()
         case MenuState::OrpCalibration:
             handleORPSelection(pressed);
             break;
+        case MenuState::Settings:
+            handleSettingsMenu(pressed);
+            break;
         case MenuState::Valves:
             handleValvesMenu(pressed);
+            break;
+        case MenuState::Thresholds:
+            if (thresholdEdit_ != ThresholdEdit::None)
+            {
+                if (pressed)
+                    thresholdEdit_ = ThresholdEdit::None;
+                else
+                    adjustThresholdFromJoystick();
+            }
+            else if (pressed)
+                handleThresholdsMenu(pressed);
             break;
         case MenuState::Off:
             break;
@@ -91,8 +109,14 @@ void Menu::draw()
         case MenuState::OrpCalibration:
             displayORPCalibrationMenu();
             break;
+        case MenuState::Settings:
+            displaySettingsMenu();
+            break;
         case MenuState::Valves:
             displayValvesMenu();
+            break;
+        case MenuState::Thresholds:
+            displayThresholdsMenu();
             break;
         case MenuState::Off:
             break;
@@ -116,13 +140,43 @@ void Menu::handleMainMenu(bool pressed)
             break;
         case 1:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(2);
-            state_ = MenuState::Valves;
+            joystick.setMaxIndex(3);   // Settings: 4 items (0-3)
+            state_ = MenuState::Settings;
             break;
         case 2:
             state_ = MenuState::Off;
             lcd.clear();                 
             needsFullRedraw_ = true;    
+            break;
+    }
+    needsFullRedraw_ = true;
+}
+
+void Menu::handleSettingsMenu(bool pressed)
+{
+    if (!pressed) return;
+
+    switch (joystick.getSelectedItem())
+    {
+        case 0:
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(1);   // Valve Control: Switch + Return
+            state_ = MenuState::Valves;
+            break;
+        case 1:
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(6);   // Thresholds: 7 items (0-6)
+            thresholdEdit_ = ThresholdEdit::None;
+            state_ = MenuState::Thresholds;
+            break;
+        case 2:
+            config_->requestResetErrors = true;
+            break;
+        case 3:
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(2);
+            state_ = MenuState::Idle;
+            lcd.clear();
             break;
     }
     needsFullRedraw_ = true;
@@ -199,15 +253,123 @@ void Menu::handleValvesMenu(bool pressed)
             config_->valvesDisabled = !config_->valvesDisabled;
             break;
         case 1:
-            config_->requestResetErrors = true;
-            break;
-        case 2:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(2);
-            state_ = MenuState::Idle;
+            joystick.setMaxIndex(3);   // back to Settings (now has 4 items)
+            state_ = MenuState::Settings;
             break;
     }
     needsFullRedraw_ = true;
+}
+
+void Menu::handleThresholdsMenu(bool pressed)
+{
+    if (!pressed) return;
+
+    switch (joystick.getSelectedItem())
+    {
+        case 0: thresholdEdit_ = ThresholdEdit::Ph;         break;
+        case 1: thresholdEdit_ = ThresholdEdit::Orp;        break;
+        case 2: thresholdEdit_ = ThresholdEdit::PhMaxTrig;  break;
+        case 3: thresholdEdit_ = ThresholdEdit::OrpMaxTrig; break;
+        case 4: thresholdEdit_ = ThresholdEdit::PhValveT;   break;
+        case 5:
+            // item 5 is OrpValveT (edit) on
+            // the joystick selection
+            thresholdEdit_ = ThresholdEdit::OrpValveT;
+            break;
+        case 6:
+            thresholdEdit_ = ThresholdEdit::None;
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(3);   // back to Settings
+            state_ = MenuState::Settings;
+            break;
+    }
+    needsFullRedraw_ = true;
+}
+
+void Menu::adjustThresholdFromJoystick()
+{
+    const int step = joystick.yAxisStep();
+    if (step == 0) return;
+
+    if (thresholdEdit_ == ThresholdEdit::Ph)
+    {
+        config_->phMinimum += step * ThresholdLimits::PH_STEP;
+        config_->phMinimum = constrain(
+            config_->phMinimum,
+            ThresholdLimits::PH_MIN,
+            ThresholdLimits::PH_MAX);
+    }
+    else if (thresholdEdit_ == ThresholdEdit::Orp)
+    {
+        config_->orpMinimum += step * ThresholdLimits::ORP_STEP;
+        config_->orpMinimum = constrain(
+            config_->orpMinimum,
+            ThresholdLimits::ORP_MIN,
+            ThresholdLimits::ORP_MAX);
+    }
+    else if (thresholdEdit_ == ThresholdEdit::PhMaxTrig)
+    {
+        config_->phMaxTrig += step * TriggerLimitBounds::STEP;
+        config_->phMaxTrig = constrain(
+            config_->phMaxTrig,
+            TriggerLimitBounds::MIN,
+            TriggerLimitBounds::MAX);
+    }
+    else if (thresholdEdit_ == ThresholdEdit::OrpMaxTrig)
+    {
+        config_->orpMaxTrig += step * TriggerLimitBounds::STEP;
+        config_->orpMaxTrig = constrain(
+            config_->orpMaxTrig,
+            TriggerLimitBounds::MIN,
+            TriggerLimitBounds::MAX);
+    }
+    else if (thresholdEdit_ == ThresholdEdit::PhValveT)
+    {
+        config_->phValveTimerSec += step * ValveTimerBounds::STEP_SEC;
+        config_->phValveTimerSec = constrain(
+            config_->phValveTimerSec,
+            ValveTimerBounds::MIN_SEC,
+            ValveTimerBounds::MAX_SEC);
+    }
+    else if (thresholdEdit_ == ThresholdEdit::OrpValveT)
+    {
+        config_->orpValveTimerSec += step * ValveTimerBounds::STEP_SEC;
+        config_->orpValveTimerSec = constrain(
+            config_->orpValveTimerSec,
+            ValveTimerBounds::MIN_SEC,
+            ValveTimerBounds::MAX_SEC);
+    }
+
+    needsFullRedraw_ = true;
+}
+
+bool Menu::persistPhBufferCalibration(int bufferIdx)
+{
+    char payload[CalibrationStorage::EXPORT_PAYLOAD_MAX];
+
+    if (!phSensors_[activePh_]->exportCalibration(payload, sizeof(payload)))
+        return false;
+
+    if (!sd_->savePhBufferCalibration(activePh_, bufferIdx, payload))
+        return false;
+
+    config_->phBufferCalibrated[activePh_][bufferIdx] = true;
+    return true;
+}
+
+bool Menu::persistOrpCalibration()
+{
+    char payload[CalibrationStorage::EXPORT_PAYLOAD_MAX];
+
+    if (!orpSensors_[activeOrp_]->exportCalibration(payload, sizeof(payload)))
+        return false;
+
+    if (!sd_->saveOrpCalibration(activeOrp_, payload))
+        return false;
+
+    config_->orpCalibrated[activeOrp_] = true;
+    return true;
 }
 
 void Menu::handlePhCalibrationSelection(bool pressed)
@@ -216,22 +378,29 @@ void Menu::handlePhCalibrationSelection(bool pressed)
     switch (joystick.getSelectedItem())
     {
         case BUFFER_4:
+            phSensors_[activePh_]->resetReadState();
             phSensors_[activePh_]->sendCmd("Cal,low,4.00");
-            bufferCalibrated_[activePh_][0] = true;
+            delay(TimingIntervals::EZO_CAL_SETTLE_MS);
+            persistPhBufferCalibration(0);
             break;
         case BUFFER_7:
+            phSensors_[activePh_]->resetReadState();
             phSensors_[activePh_]->sendCmd("Cal,mid,7.00");
-            bufferCalibrated_[activePh_][1] = true;
+            delay(TimingIntervals::EZO_CAL_SETTLE_MS);
+            persistPhBufferCalibration(1);
             break;
         case BUFFER_10:
+            phSensors_[activePh_]->resetReadState();
             phSensors_[activePh_]->sendCmd("Cal,high,10.00");
-            bufferCalibrated_[activePh_][2] = true;
+            delay(TimingIntervals::EZO_CAL_SETTLE_MS);
+            persistPhBufferCalibration(2);
             break;
         case BUFFER_CLEAR:
             phSensors_[activePh_]->sendCmd("Cal,clear");
-            bufferCalibrated_[activePh_][0] =
-            bufferCalibrated_[activePh_][1] =
-            bufferCalibrated_[activePh_][2] = false;
+            sd_->clearPhProbeCalibration(activePh_);
+            config_->phBufferCalibrated[activePh_][0] = false;
+            config_->phBufferCalibrated[activePh_][1] = false;
+            config_->phBufferCalibrated[activePh_][2] = false;
             break;
         case BUFFER_DONE:
             joystick.setSelectedItem(0);
@@ -248,10 +417,13 @@ void Menu::handleORPSelection(bool pressed)
     switch (joystick.getSelectedItem())
     {
         case 0:
+            orpSensors_[activeOrp_]->resetReadState();
             orpSensors_[activeOrp_]->sendCmd("Cal,222");
+            delay(TimingIntervals::EZO_CAL_SETTLE_MS);
+            persistOrpCalibration();
             lcd.setCursor(COL_LEFT, ROW_3);
             lcd.print("Calibrated @222mV   ");
-            delay(350); // consider removing
+            delay(350);
             joystick.setSelectedItem(0);
             joystick.setMaxIndex(MENU_DONE);
             state_ = MenuState::Calibrating;
@@ -273,7 +445,7 @@ void Menu::displayMainMenu()
         lcd.setCursor(COL_LEFT, ROW_TITLE);
         lcd.print("MAIN MENU");
         lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Calibrate Probes");
-        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Valve Control");
+        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Settings");
         lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Exit");
     }
 
@@ -282,7 +454,7 @@ void Menu::displayMainMenu()
         switch (lastSelectedItem_) 
         {
             case 0: lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Calibrate Probes"); break;
-            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Valve Control   "); break;
+            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Settings        "); break;
             case 2: lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Exit            "); break;
         }
     }
@@ -290,7 +462,7 @@ void Menu::displayMainMenu()
     switch (joystick.getSelectedItem()) 
     {
         case 0: printMenuItem(COL_LEFT, ROW_1, "Calibrate Probes", 0); break;
-        case 1: printMenuItem(COL_LEFT, ROW_2, "Valve Control",    1); break;
+        case 1: printMenuItem(COL_LEFT, ROW_2, "Settings",         1); break;
         case 2: printMenuItem(COL_LEFT, ROW_3, "Exit",             2); break;
     }
 }
@@ -341,6 +513,50 @@ void Menu::displayProbesMenu()
     }
 }
 
+void Menu::displaySettingsMenu()
+{
+    const int sel = joystick.getSelectedItem();
+
+    // 4 items (0-3), 3 display rows (ROW_1–ROW_3).
+    // Slide the window so the selection is always visible without overlap.
+    // first is clamped to [0, 1] so items first..first+2 fit in 3 rows.
+    int first = sel - 1;
+    if (first < 0) first = 0;
+    if (first > 1) first = 1;
+
+    if (needsFullRedraw_)
+    {
+        lcd.clear();
+        lcd.setCursor(COL_LEFT, ROW_TITLE);
+        lcd.print("Settings");
+        joystick.setMaxIndex(3);
+    }
+
+    const char* labels[] = {
+        "Valve Control  ",
+        "Thresholds     ",
+        "Reset Error    ",
+        "Return         "
+    };
+
+    // Repaint all three visible rows each cycle. The trailing spaces in each
+    // label guarantee that a shorter label never leaves ghost characters from
+    // a longer one that previously occupied the same row.
+    for (int r = 0; r < 3; ++r)
+    {
+        const int itemIdx = first + r;
+        const int row     = ROW_1 + r;
+
+        if (itemIdx == sel)
+            printMenuItem(COL_LEFT, row, labels[itemIdx], itemIdx);
+        else
+        {
+            lcd.setCursor(COL_LEFT, row);
+            lcd.print(labels[itemIdx]);
+        }
+    }
+}
+
 void Menu::displayValvesMenu() 
 {
     if (needsFullRedraw_) 
@@ -349,9 +565,8 @@ void Menu::displayValvesMenu()
         lcd.setCursor(COL_LEFT, ROW_TITLE);
         lcd.print(config_->valvesDisabled ? "Valves are: OFF" : "Valves are: ON ");
         lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Switch valves");
-        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Reset error");
-        lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Return");
-        joystick.setMaxIndex(2);
+        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Return");
+        joystick.setMaxIndex(1);
     }
 
     if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem()) 
@@ -359,16 +574,176 @@ void Menu::displayValvesMenu()
         switch (lastSelectedItem_)
         {
             case 0: lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Switch valves"); break;
-            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Reset error "); break;
-            case 2: lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Return      "); break;
+            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Return       "); break;
         }
     }
 
     switch (joystick.getSelectedItem())
     {
         case 0: printMenuItem(COL_LEFT, ROW_1, "Switch valves", 0); break;
-        case 1: printMenuItem(COL_LEFT, ROW_2, "Reset error",  1); break;
-        case 2: printMenuItem(COL_LEFT, ROW_3, "Return",       2); break;
+        case 1: printMenuItem(COL_LEFT, ROW_2, "Return",        1); break;
+    }
+}
+
+void Menu::displayThresholdsMenu()
+{
+    if (needsFullRedraw_)
+    {
+        lcd.clear();
+        joystick.setMaxIndex(6);  // items 0-5 are editable, item 6 is Return
+    }
+
+    // ── Active edit screens ────────────────────────────────────────────────
+    if (thresholdEdit_ == ThresholdEdit::Ph)
+    {
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("Edit pHmin      ");
+        lcd.setCursor(COL_LEFT, ROW_1);     lcd.print("Up/Dn  Press=OK ");
+        lcd.setCursor(COL_LEFT, ROW_2);
+        lcd.print("pH: ");
+        lcd.print(config_->phMinimum, 2);
+        lcd.print("           ");
+        return;
+    }
+
+    if (thresholdEdit_ == ThresholdEdit::Orp)
+    {
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("Edit ORPmin     ");
+        lcd.setCursor(COL_LEFT, ROW_1);     lcd.print("Up/Dn  Press=OK ");
+        lcd.setCursor(COL_LEFT, ROW_2);
+        lcd.print("ORP: ");
+        lcd.print((int)config_->orpMinimum);
+        lcd.print(" mV         ");
+        return;
+    }
+
+    if (thresholdEdit_ == ThresholdEdit::PhMaxTrig)
+    {
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("Edit pHMaxTrig  ");
+        lcd.setCursor(COL_LEFT, ROW_1);     lcd.print("Up/Dn  Press=OK ");
+        lcd.setCursor(COL_LEFT, ROW_2);
+        lcd.print("pH trig/hr: ");
+        lcd.print(config_->phMaxTrig);
+        lcd.print("   ");
+        return;
+    }
+
+    if (thresholdEdit_ == ThresholdEdit::OrpMaxTrig)
+    {
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("Edit ORPMaxTrig ");
+        lcd.setCursor(COL_LEFT, ROW_1);     lcd.print("Up/Dn  Press=OK ");
+        lcd.setCursor(COL_LEFT, ROW_2);
+        lcd.print("ORP trig/hr: ");
+        lcd.print(config_->orpMaxTrig);
+        lcd.print("   ");
+        return;
+    }
+
+    if (thresholdEdit_ == ThresholdEdit::PhValveT)
+    {
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("Edit pH ValveTmr");
+        lcd.setCursor(COL_LEFT, ROW_1);     lcd.print("Up/Dn  Press=OK ");
+        lcd.setCursor(COL_LEFT, ROW_2);
+        lcd.print("pH valve: ");
+        lcd.print(config_->phValveTimerSec);
+        lcd.print(" s   ");
+        return;
+    }
+
+    if (thresholdEdit_ == ThresholdEdit::OrpValveT)
+    {
+        lcd.setCursor(COL_LEFT, ROW_TITLE); lcd.print("Edit ORP ValveTmr");
+        lcd.setCursor(COL_LEFT, ROW_1);     lcd.print("Up/Dn  Press=OK ");
+        lcd.setCursor(COL_LEFT, ROW_2);
+        lcd.print("ORP valve: ");
+        lcd.print(config_->orpValveTimerSec);
+        lcd.print(" s   ");
+        return;
+    }
+
+    // ── Browser (no active edit) ───────────────────────────────────────────
+    // The 20×4 LCD has rows 0-3.  Row 0 = title "Thresholds".
+    // Rows 1-3 show a rolling window of items; each item label is on the
+    // left and its current value on the right.  "Return" (item 6) appears
+    // on ROW_3 only when selected.
+
+    if (needsFullRedraw_)
+    {
+        lcd.setCursor(COL_LEFT, ROW_TITLE);
+        lcd.print("Thresholds          ");
+    }
+
+    // Helper lambda-style local: print one row from the 7-item list.
+    // Items 0-5 are editable values; item 6 is Return.
+    // We display items [sel-1 .. sel+1] centred on rows 1-3 when possible,
+    // but for simplicity we use a fixed mapping: always show items 0-2 on
+    // rows 1-3 and scroll the highlight label onto the appropriate row.
+    // Because we have 7 items and only 3 data rows, we use a simple
+    // 3-row sliding window based on the selected index.
+    const int sel = joystick.getSelectedItem();
+    // Window: first item on ROW_1
+    int first = sel - 1;
+    if (first < 0) first = 0;
+    if (first > 4) first = 4;  // leave room for 3 rows (items first..first+2)
+
+    // Labels and current values for each item
+    auto printRow = [&](int row, int itemIdx)
+    {
+        lcd.setCursor(COL_LEFT, row);
+        switch (itemIdx)
+        {
+            case 0:
+                lcd.print("pH min:");
+                lcd.print(config_->phMinimum, 2);
+                lcd.print(" ");
+                break;
+            case 1:
+                lcd.print("ORP min:");
+                lcd.print((int)config_->orpMinimum);
+                lcd.print("  ");
+                break;
+            case 2:
+                lcd.print("pHMaxTrig:");
+                lcd.print(config_->phMaxTrig);
+                lcd.print("   ");
+                break;
+            case 3:
+                lcd.print("ORPMaxTrig:");
+                lcd.print(config_->orpMaxTrig);
+                lcd.print("   ");
+                break;
+            case 4:
+                lcd.print("pH valve:");
+                lcd.print(config_->phValveTimerSec);
+                lcd.print("s  ");
+                break;
+            case 5:
+                lcd.print("ORP valve:");
+                lcd.print(config_->orpValveTimerSec);
+                lcd.print("s  ");
+                break;
+            case 6:
+                lcd.print("Return    ");
+                break;
+        }
+    };
+
+    printRow(ROW_1, first);
+    printRow(ROW_2, first + 1);
+    printRow(ROW_3, first + 2);
+
+    // Highlight (blink) the selected item on its row
+    const int selRow = ROW_1 + (sel - first);
+    if (selRow >= ROW_1 && selRow <= ROW_3)
+    {
+        if (sel == 6)
+            printMenuItem(COL_LEFT, selRow, "Return              ", sel);
+        else
+        {
+            // Blink just the "Set" label on the right side
+            const char* labels[] = { "Set", "Set", "Set",
+                                     "Set", "Set", "Set" };
+            printMenuItem(COL_FAR_RIGHT, selRow, labels[sel], sel);
+        }
     }
 }
 
@@ -386,9 +761,9 @@ void Menu::displayPhMenu()
         }
 
         // Stars for calibrated buffers of the active pH probe
-        if (bufferCalibrated_[activePh_][0]) { lcd.setCursor(COL_MID, ROW_1); lcd.print("*"); }
-        if (bufferCalibrated_[activePh_][1]) { lcd.setCursor(COL_MID, ROW_2); lcd.print("*"); }
-        if (bufferCalibrated_[activePh_][2]) { lcd.setCursor(COL_MID, ROW_3); lcd.print("*"); }
+        if (config_->phBufferCalibrated[activePh_][0]) { lcd.setCursor(COL_MID, ROW_1); lcd.print("*"); }
+        if (config_->phBufferCalibrated[activePh_][1]) { lcd.setCursor(COL_MID, ROW_2); lcd.print("*"); }
+        if (config_->phBufferCalibrated[activePh_][2]) { lcd.setCursor(COL_MID, ROW_3); lcd.print("*"); }
 
         joystick.setMaxIndex(4);
     }
@@ -424,10 +799,17 @@ void Menu::displayORPCalibrationMenu()
         lcd.print("ORP");
         lcd.print(activeOrp_ + 1);
         lcd.print(": ");
-        lcd.print((int)config_->orpValues[activeOrp_]);
-        lcd.print("mV   ");
         joystick.setMaxIndex(1);
     }
+
+    // Live ORP reading — outside needsFullRedraw_ so it refreshes on every
+    // render pass (driven by uiTimer_), matching how displayPhMenu keeps the
+    // pH value current. Previously this was inside the needsFullRedraw_ block,
+    // so the value was printed only once when the screen first appeared and
+    // never updated again while the user waited for the probe to stabilise.
+    lcd.setCursor(COL_LEFT + 6, ROW_3);  // column 6: after "ORP" + digit + ": "
+    lcd.print((int)config_->orpValues[activeOrp_]);
+    lcd.print("mV   ");
 
     if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem()) 
     {
@@ -449,9 +831,9 @@ void Menu::displayORPCalibrationMenu()
 
 bool Menu::allPHBuffersCalibrated() 
 {
-    return bufferCalibrated_[activePh_][0] &&
-           bufferCalibrated_[activePh_][1] &&
-           bufferCalibrated_[activePh_][2];
+    return config_->phBufferCalibrated[activePh_][0] &&
+           config_->phBufferCalibrated[activePh_][1] &&
+           config_->phBufferCalibrated[activePh_][2];
 }
 
 void Menu::displayError(const String& error) 

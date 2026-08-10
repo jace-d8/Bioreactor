@@ -29,6 +29,7 @@ public:
     void clear();
 
     void print(const char* str);
+    void print(int val);
     void print(float val, int prec);
     void print(const String& text);
     void print(char c);           
