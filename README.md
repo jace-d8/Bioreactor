@@ -14,6 +14,7 @@ On a 2-second cadence, the firmware:
 6. Sensor readings are written to the SD card every 2 seconds, and individual valve events get logged as message rows.
 
 The LCD shows live readings when idle. The joystick (analog Y axis + push switch) opens the menu, where you can calibrate any probe and toggle valve control.
+
 The timestamp is synced on boot via WiFi. Currently, the WiFi connection is set to be automatically connected to Washington State University Guest WiFi (WSU Guest), an open WiFi that requires adding the Arduino Nano ESP32 MAC address to a whitelist. WiFi SSID and time zone can be changed in config.h.
 
 ## Hardware
