@@ -14,6 +14,7 @@ On a 2-second cadence, the firmware:
 6. Sensor readings are written to the SD card every 2 seconds, and individual valve events get logged as message rows.
 
 The LCD shows live readings when idle. The joystick (analog Y axis + push switch) opens the menu, where you can calibrate any probe and toggle valve control.
+The timestamp is synced on boot via WiFi. Currently, the WiFi connection is set to be automatically connected to Washington State University Guest WiFi (WSU Guest), an open WiFi that requires adding the Arduino Nano ESP32 MAC address to a whitelist. WiFi SSID and time zone can be changed in config.h.
 
 ## Hardware
 
@@ -122,7 +123,7 @@ namespace TimingIntervals
 | [`Menu.{h,cpp}`](src/BioReactor/Menu.h) | UI state machine (`Idle / Calibrating / Valves / PhCalibration / OrpCalibration / Off`). Probe calibration writes EZO `Cal,low/mid/high/clear` commands; valve menu toggles dosing on/off and resets error locks. |
 | [`Timer.{h,cpp}`](src/BioReactor/Timer.h) | Interval timer: `isReady()` returns true once `interval` has elapsed since last `reset()`. |
 | [`ActionTimer.h`](src/BioReactor/ActionTimer.h) | One-shot cooldown timer. `start()` arms it, `done()` reports whether the duration has elapsed. |
-
+| [`Wifi.h`](src/BioReactor/Wifi.h) | Connects the system to Wifi and syncs time at boot. Writes the status of time sync to the log file |
 ## Logging format
 
 Every row in `LOG####.CSV` has the header `timestamp,pH1,ORP1,pH2,ORP2,pH3,ORP3,message`.
