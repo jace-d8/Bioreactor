@@ -66,6 +66,15 @@ private:
 
   String makeNextFilename_();
   const char* valveName_(int valveId) const;
+
+  // Shared by logValveOn/logValveLocked. Writes a row with only the
+  // ph_valve_* columns filled (if valveId is a pH valve) or only the
+  // orp_valve_* columns filled (if it's an ORP valve) — never both, and
+  // never the generic "message" column. This is what keeps pH-valve,
+  // ORP-valve, and general-message events in separate columns so each can
+  // be filtered/processed without wading through the other types' blanks.
+  void logValveEvent_(int valveId, const char* suffix);
+
   static const char* phBufferName_(int bufferIdx);
   static bool parseBufferName_(const char* name, int& bufferIdx);
 

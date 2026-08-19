@@ -118,12 +118,30 @@ namespace CalibrationStorage
   const size_t EXPORT_PAYLOAD_MAX = 160;
 }
 
+namespace WifiConfig//WiFi + NTP time sync configuration//
+{
+  const char* const SSID = "WSU Guest";//Open network, no password required//
+  const long UTC_OFFSET_SEC = -7 * 3600;//Pacific time offset applied to NTP time//
+  const char* const NTP_SERVER = "pool.ntp.org";
+
+  const unsigned long CONNECT_TIMEOUT_MS = 15000UL;//*give up joining WiFi after 15 s//
+  const unsigned long TIME_WAIT_MS       = 5000UL;//*give up waiting for an NTP reply after 5 s//
+  const unsigned long RESYNC_INTERVAL_MS = 12UL * 60UL * 60UL * 1000UL;//*resync every 12 h once synced, to correct RTC drift//
+  const unsigned long RETRY_INTERVAL_MS  = 30UL * 60UL * 1000UL;//*retry every 30 min after a failed attempt//
+}
+
 struct ConfigState//Global configuration state//
 {
   bool valvesDisabled = false;//Valves disabled flag//
   bool lcdCleared = false;//LCD cleared flag//
   bool blinkState = true;//Blink state flag//
   bool requestResetErrors = false;//Request reset errors flag//
+
+  // Cached "AA:BB:CC:DD:EE:FF" string, filled once at boot from the radio's
+  // MAC address. Reading it doesn't require joining a network, so this adds
+  // no meaningful delay to startup. Shown on demand via the Settings > Show
+  // MAC menu item, rather than printed on every boot.
+  char macAddress[18] = "";
 
   bool valveErrorLocked[ValveMappings::TOTAL_VALVES] = {};//Valve error locked flags//
 

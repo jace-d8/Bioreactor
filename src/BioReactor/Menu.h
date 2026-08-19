@@ -31,12 +31,14 @@ enum PhCalibrationIndices {
 };
 
 class SdLogger;
+class WifiTime;
 
 class Menu {
 private:
     // Core state / deps
     ConfigState* config_;
     SdLogger* sd_;
+    WifiTime* wifi_;
     EzoBoard* phSensors_[3];   
     EzoBoard* orpSensors_[3]; 
     int activePh_;            
@@ -44,7 +46,7 @@ private:
     Lcd& lcd;
 
     // Menu state
-    enum class MenuState { Idle, Settings, Valves, Thresholds, Calibrating, PhCalibration, OrpCalibration, Error, Off };
+    enum class MenuState { Idle, Settings, ShowMac, Thresholds, Calibrating, PhCalibration, OrpCalibration, Error, Off };
     MenuState state_ = MenuState::Off;
 
     enum class ThresholdEdit {
@@ -82,7 +84,7 @@ private:
     };
 
 public:
-    Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd, SdLogger& sd);
+    Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd, SdLogger& sd, WifiTime& wifi);
     void enter();
     void update();
     void draw();
@@ -95,7 +97,7 @@ private:
     void handleMainMenu(bool pressed);
     void handleSettingsMenu(bool pressed);
     void handleProbesMenu(bool pressed);
-    void handleValvesMenu(bool pressed);
+    void handleShowMac(bool pressed);
     void handleThresholdsMenu(bool pressed);
     void adjustThresholdFromJoystick();
     void handlePhCalibrationSelection(bool pressed);
@@ -105,7 +107,7 @@ private:
     void displayMainMenu();
     void displaySettingsMenu();
     void displayProbesMenu();
-    void displayValvesMenu();
+    void displayShowMac();
     void displayThresholdsMenu();
     void displayPhMenu();
     void displayORPCalibrationMenu();

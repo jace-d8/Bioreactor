@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <SPI.h>
+#include <string.h>
 #include "Config.h"
 #include "Mcp.h"
 #include "EzoBoard.h"
@@ -8,10 +9,10 @@
 #include "Timer.h"
 #include "ActionTimer.h"
 #include "Menu.h"
-
-#define UTC_OFFSET (-7 * 3600)
+#include "Wifi.h"
 
 ConfigState config;
+WifiTime wifiTime;//non-blocking WiFi connect + NTP sync, keeps the clock correct across power cycles//
 
 EzoBoard orpSensors[3] = {//set up ORP sensors (3 probes)//
   EzoBoard(EzoAddresses::ORP[0], "ORP"),
@@ -28,7 +29,7 @@ EzoBoard phSensors[3] = {//set up pH sensors (3 probes)//
 Mcp mcp;//set up MCP controller (controls the valves)//
 Lcd lcd(0x27, &Wire1);//set up LCD display//
 SdLogger sd;//set up SD card logger//
-Menu menu(&config, phSensors, orpSensors, lcd, sd);
+Menu menu(&config, phSensors, orpSensors, lcd, sd, wifiTime);
 
 Timer probeTimer(TimingIntervals::PROBE_READ_INTERVAL);//*2 s between probe reads//
 Timer sdLogTimer(TimingIntervals::SD_LOG_INTERVAL);//*2 s between SD card logs//
@@ -215,6 +216,14 @@ void handleProbeReads()
 // ── setup ─────────────────────────────────────────────────────────────────────
 void setup()
 {
+  // Starts the WiFi radio (station mode) and kicks off the first background
+  // connect+NTP-sync attempt. WiFi.mode(WIFI_STA) alone is what makes the
+  // MAC address available below — it does not wait to join a network, so
+  // this does not add a meaningful delay to boot.
+  wifiTime.begin();
+  strncpy(config.macAddress, wifiTime.macAddress().c_str(), sizeof(config.macAddress) - 1);
+  config.macAddress[sizeof(config.macAddress) - 1] = '\0';
+
   Wire.begin();
   Wire.setClock(BusSpeeds::I2C_HZ);
   // Release the bus automatically if any I2C transaction stalls for more than
@@ -233,7 +242,11 @@ void setup()
 
   SPI.begin();
 
-  configTime(UTC_OFFSET, 0, "");
+  // Sets the display timezone offset only (empty server = no NTP contact
+  // here). setTimeFromBuild() below then seeds the clock with the firmware
+  // compile time as an immediate fallback; wifiTime's background NTP sync
+  // will overwrite it with the real time as soon as WiFi + NTP succeed.
+  configTime(WifiConfig::UTC_OFFSET_SEC, 0, "");
 
   const bool sdReady = sd.begin(PinConfigurations::SD_CHIP_SELECT, BusSpeeds::SD_SPI_HZ);
   sd.setTimeFromBuild();
@@ -256,6 +269,10 @@ void setup()
 // ── loop ──────────────────────────────────────────────────────────────────────
 void loop()
 {
+  // Advances the WiFi connect / NTP sync state machine by one step. Never
+  // blocks for more than a few ms, so this is safe to call every iteration.
+  wifiTime.update(sd);
+
   if (probeTimer.isReady())
     handleProbeReads();
 

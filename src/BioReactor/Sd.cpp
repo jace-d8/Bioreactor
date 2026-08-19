@@ -4,6 +4,63 @@
 #include <sys/time.h>
 #include <string.h>
 
+// ── CSV row layout ───────────────────────────────────────────────────────────
+// timestamp,pH1,ORP1,pH2,ORP2,pH3,ORP3,ph_valve_timestamp,ph_valve_message,orp_valve_timestamp,orp_valve_message,message
+//     0       1   2   3   4   5   6          7                   8                9                  10          11
+//
+// Each row type only fills the columns relevant to it and leaves the rest
+// blank:
+//   - logData      -> fields 0-6   (periodic probe readings)
+//   - logValveOn/  -> fields 7-8   (pH valve events) or 9-10 (ORP valve events)
+//     logValveLocked
+//   - logMessage   -> fields 0 and 11 (general events: boot, calibration, etc.)
+//
+// Splitting pH-valve, ORP-valve, and general messages into separate
+// timestamp+message column pairs means each event type can be filtered and
+// processed on its own without every other row type showing up as blank
+// cells in between.
+namespace {
+
+// Joins exactly 12 fields into a single CSV row (comma-separated, newline
+// terminated). Centralising this avoids hand-counting commas in format
+// strings whenever a row type's column layout changes.
+void buildCsvRow(char* out, size_t outLen, const char* const fields[12])
+{
+  size_t pos = 0;
+  for (int i = 0; i < 12; ++i)
+  {
+    const char* f = fields[i] ? fields[i] : "";
+    const size_t flen = strlen(f);
+    if (pos + flen < outLen)
+    {
+      memcpy(out + pos, f, flen);
+      pos += flen;
+    }
+    if (i < 11 && pos + 1 < outLen)
+      out[pos++] = ',';
+  }
+  if (pos + 1 < outLen)
+    out[pos++] = '\n';
+  out[pos] = '\0';
+}
+
+// Formats the current local time as "YYYY-MM-DD HH:MM:SS" into buf.
+// Returns false (buf untouched) if the system clock isn't available yet,
+// matching the guard every row-writer already used.
+bool formatTimestamp(char* buf, size_t bufLen)
+{
+  time_t now = time(nullptr);
+  struct tm* ti = localtime(&now);
+  if (!ti) return false;
+
+  snprintf(buf, bufLen, "%04d-%02d-%02d %02d:%02d:%02d",
+    ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday,
+    ti->tm_hour, ti->tm_min, ti->tm_sec);
+  return true;
+}
+
+}  // namespace
+
 // ── diag_ ────────────────────────────────────────────────────────────────────
 void SdLogger::diag_(const char* line)
 {
@@ -46,7 +103,7 @@ bool SdLogger::begin(uint8_t csPin, uint32_t spiHz)
     return false;
   }
 
-  dataFile_.println("timestamp,pH1,ORP1,pH2,ORP2,pH3,ORP3,message");
+  dataFile_.println("timestamp,pH1,ORP1,pH2,ORP2,pH3,ORP3,ph_valve_timestamp,ph_valve_message,orp_valve_timestamp,orp_valve_message,message");
   dataFile_.flush();
   ready_ = true;
 
@@ -193,15 +250,13 @@ bool SdLogger::writeRow_(const char* row, bool flushAfterWrite)
   // ── Recovery marker ───────────────────────────────────────────────────────
   if (justRecovered)
   {
-    time_t ts = time(nullptr);
-    struct tm* ti = localtime(&ts);
-    if (ti)
+    char ts[24];
+    if (formatTimestamp(ts, sizeof(ts)))
     {
-      char marker[80];
-      snprintf(marker, sizeof(marker),
-        "%04d-%02d-%02d %02d:%02d:%02d,,,,,,,[SD logging recovered]\n",
-        ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday,
-        ti->tm_hour, ti->tm_min, ti->tm_sec);
+      const char* fields[12] = { ts, "", "", "", "", "", "",
+                                  "", "", "", "", "[SD logging recovered]" };
+      char marker[160];
+      buildCsvRow(marker, sizeof(marker), fields);
       dataFile_.print(marker);
     }
     // Always flush the recovery marker immediately so it is committed even if
@@ -254,20 +309,23 @@ void SdLogger::logData(const ConfigState& config)
 {
   if (!ready_) return;
 
-  time_t now = time(nullptr);
-  struct tm* ti = localtime(&now);
-  if (!ti) return;
+  char ts[24];
+  if (!formatTimestamp(ts, sizeof(ts))) return;
 
-  // Build the row on the stack — no heap allocation.
-  char row[80];
-  snprintf(row, sizeof(row),
-    "%04d-%02d-%02d %02d:%02d:%02d,%.3f,%.0f,%.3f,%.0f,%.3f,%.0f,\n",
-    ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday,
-    ti->tm_hour, ti->tm_min, ti->tm_sec,
-    config.phValues[0], config.orpValues[0],
-    config.phValues[1], config.orpValues[1],
-    config.phValues[2], config.orpValues[2]);
+  // Build each value on the stack — no heap allocation.
+  char ph1[12], orp1[12], ph2[12], orp2[12], ph3[12], orp3[12];
+  snprintf(ph1,  sizeof(ph1),  "%.3f", config.phValues[0]);
+  snprintf(orp1, sizeof(orp1), "%.0f", config.orpValues[0]);
+  snprintf(ph2,  sizeof(ph2),  "%.3f", config.phValues[1]);
+  snprintf(orp2, sizeof(orp2), "%.0f", config.orpValues[1]);
+  snprintf(ph3,  sizeof(ph3),  "%.3f", config.phValues[2]);
+  snprintf(orp3, sizeof(orp3), "%.0f", config.orpValues[2]);
 
+  const char* fields[12] = { ts, ph1, orp1, ph2, orp2, ph3, orp3,
+                              "", "", "", "", "" };
+
+  char row[128];
+  buildCsvRow(row, sizeof(row), fields);
   writeRow_(row, false);  // defer flush; data rows commit on the 5-minute timer
 }
 
@@ -300,42 +358,59 @@ void SdLogger::setTimeFromBuild()
 
 // ── logMessage ────────────────────────────────────────────────────────────────
 // Accepts a plain C string to avoid any heap allocation in the hot path.
-// The String overload in Sd.h delegates here via .c_str().
+// The String overload in Sd.h delegates here via .c_str(). Used for general,
+// non-valve events (boot, calibration, SD recovery) — these go in the
+// generic "message" column, separate from the per-valve-type columns.
 void SdLogger::logMessage(const char* message)
 {
   if (!ready_) return;
 
-  time_t now = time(nullptr);
-  struct tm* ti = localtime(&now);
-  if (!ti) return;
+  char ts[24];
+  if (!formatTimestamp(ts, sizeof(ts))) return;
 
-  // Build the message row on the stack.
-  char row[100];
-  snprintf(row, sizeof(row),
-    "%04d-%02d-%02d %02d:%02d:%02d,,,,,,,%s\n",
-    ti->tm_year + 1900, ti->tm_mon + 1, ti->tm_mday,
-    ti->tm_hour, ti->tm_min, ti->tm_sec,
-    message);
+  const char* fields[12] = { ts, "", "", "", "", "", "",
+                              "", "", "", "", message };
 
+  char row[160];
+  buildCsvRow(row, sizeof(row), fields);
   writeRow_(row, true);   // flush immediately: message rows are real-time events
 }
 
-// ── logValveOn / logValveLocked ───────────────────────────────────────────────
-// Use stack char arrays instead of String concatenation so that repeated valve
-// events cannot fragment the ESP32 heap allocator over a long run.
-void SdLogger::logValveOn(int valveId)
+// ── logValveEvent_ / logValveOn / logValveLocked ─────────────────────────────
+// Use stack char arrays instead of String concatenation so that repeated
+// valve events cannot fragment the ESP32 heap allocator over a long run.
+//
+// pH valve events (ids 0, 2, 4) go in ph_valve_timestamp/ph_valve_message;
+// ORP valve events (ids 1, 3, 5) go in orp_valve_timestamp/orp_valve_message.
+// Every other column, including the generic "message" column, is left blank
+// on these rows so pH-valve, ORP-valve, and general-message history can each
+// be read straight down their own two columns with no unrelated blanks.
+void SdLogger::logValveEvent_(int valveId, const char* suffix)
 {
+  if (!ready_) return;
+
+  char ts[24];
+  if (!formatTimestamp(ts, sizeof(ts))) return;
+
   char msg[32];
-  snprintf(msg, sizeof(msg), "%s valve triggered", valveName_(valveId));
-  logMessage(msg);
+  snprintf(msg, sizeof(msg), "%s valve %s", valveName_(valveId), suffix);
+
+  const bool isPh = (valveId % 2 == 0);
+
+  const char* fields[12] = { "", "", "", "", "", "", "",
+                              isPh ? ts  : "",
+                              isPh ? msg : "",
+                              isPh ? ""  : ts,
+                              isPh ? ""  : msg,
+                              "" };
+
+  char row[160];
+  buildCsvRow(row, sizeof(row), fields);
+  writeRow_(row, true);   // flush immediately: valve events are real-time
 }
 
-void SdLogger::logValveLocked(int valveId)
-{
-  char msg[32];
-  snprintf(msg, sizeof(msg), "%s valve locked", valveName_(valveId));
-  logMessage(msg);
-}
+void SdLogger::logValveOn(int valveId)     { logValveEvent_(valveId, "triggered"); }
+void SdLogger::logValveLocked(int valveId) { logValveEvent_(valveId, "locked"); }
 
 // ── phBufferName_ / parseBufferName_ ─────────────────────────────────────────
 const char* SdLogger::phBufferName_(int bufferIdx)

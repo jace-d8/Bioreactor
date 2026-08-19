@@ -1,9 +1,10 @@
 #include "Menu.h"
 #include "Sd.h"
+#include "Wifi.h"
 
 
-Menu::Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd, SdLogger& sd)
-    : config_(config), sd_(&sd), lcd(lcd)
+Menu::Menu(ConfigState* config, EzoBoard* phSensors, EzoBoard* orpSensors, Lcd& lcd, SdLogger& sd, WifiTime& wifi)
+    : config_(config), sd_(&sd), wifi_(&wifi), lcd(lcd)
 {
     for (int i = 0; i < 3; i++)
     {
@@ -21,7 +22,7 @@ void Menu::enter()
         state_ = MenuState::Idle;
         needsFullRedraw_ = true;
         joystick.setSelectedItem(0);
-        joystick.setMaxIndex(2);
+        joystick.setMaxIndex(3);   // Main menu: 4 items (0-3)
     }
 }
 
@@ -57,8 +58,8 @@ void Menu::update()
         case MenuState::Settings:
             handleSettingsMenu(pressed);
             break;
-        case MenuState::Valves:
-            handleValvesMenu(pressed);
+        case MenuState::ShowMac:
+            handleShowMac(pressed);
             break;
         case MenuState::Thresholds:
             if (thresholdEdit_ != ThresholdEdit::None)
@@ -112,8 +113,8 @@ void Menu::draw()
         case MenuState::Settings:
             displaySettingsMenu();
             break;
-        case MenuState::Valves:
-            displayValvesMenu();
+        case MenuState::ShowMac:
+            displayShowMac();
             break;
         case MenuState::Thresholds:
             displayThresholdsMenu();
@@ -144,6 +145,9 @@ void Menu::handleMainMenu(bool pressed)
             state_ = MenuState::Settings;
             break;
         case 2:
+            config_->requestResetErrors = true;
+            break;
+        case 3:
             state_ = MenuState::Off;
             lcd.clear();                 
             needsFullRedraw_ = true;    
@@ -159,22 +163,23 @@ void Menu::handleSettingsMenu(bool pressed)
     switch (joystick.getSelectedItem())
     {
         case 0:
-            joystick.setSelectedItem(0);
-            joystick.setMaxIndex(1);   // Valve Control: Switch + Return
-            state_ = MenuState::Valves;
+            // pH/ORP valves: direct toggle, no submenu needed.
+            config_->valvesDisabled = !config_->valvesDisabled;
             break;
         case 1:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(6);   // Thresholds: 7 items (0-6)
+            joystick.setMaxIndex(6);   // pH/ORP settings: 7 items (0-6)
             thresholdEdit_ = ThresholdEdit::None;
             state_ = MenuState::Thresholds;
             break;
         case 2:
-            config_->requestResetErrors = true;
+            joystick.setSelectedItem(0);
+            joystick.setMaxIndex(1);   // Show MAC and WiFi: 2 items (Sync Now / Return)
+            state_ = MenuState::ShowMac;
             break;
         case 3:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(2);
+            joystick.setMaxIndex(3);   // back to Main menu (4 items)
             state_ = MenuState::Idle;
             lcd.clear();
             break;
@@ -235,7 +240,7 @@ void Menu::handleProbesMenu(bool pressed)
         // ----- done / back -----
         case MENU_DONE:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(2);
+            joystick.setMaxIndex(3);   // back to Main menu (4 items)
             state_ = MenuState::Idle;
             lcd.clear();
             break;
@@ -243,18 +248,21 @@ void Menu::handleProbesMenu(bool pressed)
     needsFullRedraw_ = true;
 }
 
-void Menu::handleValvesMenu(bool pressed)
+void Menu::handleShowMac(bool pressed)
 {
     if (!pressed) return;
 
     switch (joystick.getSelectedItem())
     {
         case 0:
-            config_->valvesDisabled = !config_->valvesDisabled;
+            // Manually kick off a connect+sync attempt right now. Stays on
+            // this screen so the live WiFi/sync status lines above show the
+            // attempt play out in real time.
+            wifi_->syncNow();
             break;
         case 1:
             joystick.setSelectedItem(0);
-            joystick.setMaxIndex(3);   // back to Settings (now has 4 items)
+            joystick.setMaxIndex(3);   // back to Settings (4 items)
             state_ = MenuState::Settings;
             break;
     }
@@ -439,31 +447,43 @@ void Menu::handleORPSelection(bool pressed)
 
 void Menu::displayMainMenu() 
 {
+    const int sel = joystick.getSelectedItem();
+
+    // 4 items (0-3), 3 display rows (ROW_1-ROW_3) — same sliding-window
+    // pattern as displaySettingsMenu, since one more item no longer fits
+    // statically on ROW_1..ROW_3.
+    int first = sel - 1;
+    if (first < 0) first = 0;
+    if (first > 1) first = 1;
+
     if (needsFullRedraw_) 
     {
         lcd.clear();
         lcd.setCursor(COL_LEFT, ROW_TITLE);
         lcd.print("MAIN MENU");
-        lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Calibrate Probes");
-        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Settings");
-        lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Exit");
     }
 
-    if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem()) 
+    char labelBuf[4][20];
+    snprintf(labelBuf[0], sizeof(labelBuf[0]), "%-19s", "Calibrate Probes");
+    snprintf(labelBuf[1], sizeof(labelBuf[1]), "%-19s", "Settings");
+    snprintf(labelBuf[2], sizeof(labelBuf[2]), "%-19s", "Reset Errors");
+    snprintf(labelBuf[3], sizeof(labelBuf[3]), "%-19s", "Exit");
+    const char* labels[] = { labelBuf[0], labelBuf[1], labelBuf[2], labelBuf[3] };
+
+    // Repaint all three visible rows each cycle so a shorter label never
+    // leaves ghost characters from a longer one that was previously there.
+    for (int r = 0; r < 3; ++r)
     {
-        switch (lastSelectedItem_) 
+        const int itemIdx = first + r;
+        const int row     = ROW_1 + r;
+
+        if (itemIdx == sel)
+            printMenuItem(COL_LEFT, row, labels[itemIdx], itemIdx);
+        else
         {
-            case 0: lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Calibrate Probes"); break;
-            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Settings        "); break;
-            case 2: lcd.setCursor(COL_LEFT, ROW_3); lcd.print("Exit            "); break;
+            lcd.setCursor(COL_LEFT, row);
+            lcd.print(labels[itemIdx]);
         }
-    }
-
-    switch (joystick.getSelectedItem()) 
-    {
-        case 0: printMenuItem(COL_LEFT, ROW_1, "Calibrate Probes", 0); break;
-        case 1: printMenuItem(COL_LEFT, ROW_2, "Settings",         1); break;
-        case 2: printMenuItem(COL_LEFT, ROW_3, "Exit",             2); break;
     }
 }
 
@@ -532,12 +552,13 @@ void Menu::displaySettingsMenu()
         joystick.setMaxIndex(3);
     }
 
-    const char* labels[] = {
-        "Valve Control  ",
-        "Thresholds     ",
-        "Reset Error    ",
-        "Return         "
-    };
+    char labelBuf[4][19];
+    snprintf(labelBuf[0], sizeof(labelBuf[0]), "%-18s",
+             config_->valvesDisabled ? "pH/ORP valves:OFF" : "pH/ORP valves:ON");
+    snprintf(labelBuf[1], sizeof(labelBuf[1]), "%-18s", "pH/ORP settings");
+    snprintf(labelBuf[2], sizeof(labelBuf[2]), "%-18s", "Show MAC and WiFi");
+    snprintf(labelBuf[3], sizeof(labelBuf[3]), "%-18s", "Return");
+    const char* labels[] = { labelBuf[0], labelBuf[1], labelBuf[2], labelBuf[3] };
 
     // Repaint all three visible rows each cycle. The trailing spaces in each
     // label guarantee that a shorter label never leaves ghost characters from
@@ -557,31 +578,56 @@ void Menu::displaySettingsMenu()
     }
 }
 
-void Menu::displayValvesMenu() 
+void Menu::displayShowMac()
 {
-    if (needsFullRedraw_) 
+    const int sel = joystick.getSelectedItem();
+
+    if (needsFullRedraw_)
     {
         lcd.clear();
-        lcd.setCursor(COL_LEFT, ROW_TITLE);
-        lcd.print(config_->valvesDisabled ? "Valves are: OFF" : "Valves are: ON ");
-        lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Switch valves");
-        lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Return");
-        joystick.setMaxIndex(1);
+        joystick.setMaxIndex(1);   // 2 items: Sync Now / Return
     }
 
-    if (!needsFullRedraw_ && lastSelectedItem_ != -1 && lastSelectedItem_ != joystick.getSelectedItem()) 
+    // MAC address, WiFi connection state, and sync status are all printed
+    // every render pass (not gated behind needsFullRedraw_) so this screen
+    // stays live while the user is looking at it — e.g. watching WiFi go
+    // from Disconnected to Connected, or a manual sync complete in real
+    // time after pressing "Sync Now".
+    char line[20];
+
+    snprintf(line, sizeof(line), "%-19s",
+             config_->macAddress[0] ? config_->macAddress : "(not available)");
+    lcd.setCursor(COL_LEFT, ROW_TITLE);
+    lcd.print(line);
+
+    snprintf(line, sizeof(line), "%-19s",
+             wifi_->isConnected() ? "WiFi Connected" : "WiFi Disconnected");
+    lcd.setCursor(COL_LEFT, ROW_1);
+    lcd.print(line);
+
+    char syncStatus[24];
+    wifi_->syncStatus(syncStatus, sizeof(syncStatus));
+    snprintf(line, sizeof(line), "%-19s", syncStatus);
+    lcd.setCursor(COL_LEFT, ROW_2);
+    lcd.print(line);
+
+    // Action row: the radio is deliberately disconnected between scheduled
+    // syncs, so "Disconnected" alone doesn't tell you much — this lets you
+    // force an attempt on demand and watch the lines above update live.
+    if (sel == 0)
+        printMenuItem(COL_LEFT, ROW_3, "Sync Now", 0);
+    else
     {
-        switch (lastSelectedItem_)
-        {
-            case 0: lcd.setCursor(COL_LEFT, ROW_1); lcd.print("Switch valves"); break;
-            case 1: lcd.setCursor(COL_LEFT, ROW_2); lcd.print("Return       "); break;
-        }
+        lcd.setCursor(COL_LEFT, ROW_3);
+        lcd.print("Sync Now");
     }
 
-    switch (joystick.getSelectedItem())
+    if (sel == 1)
+        printMenuItem(COL_RIGHT, ROW_3, "Return", 1);
+    else
     {
-        case 0: printMenuItem(COL_LEFT, ROW_1, "Switch valves", 0); break;
-        case 1: printMenuItem(COL_LEFT, ROW_2, "Return",        1); break;
+        lcd.setCursor(COL_RIGHT, ROW_3);
+        lcd.print("Return");
     }
 }
 
@@ -669,7 +715,7 @@ void Menu::displayThresholdsMenu()
     if (needsFullRedraw_)
     {
         lcd.setCursor(COL_LEFT, ROW_TITLE);
-        lcd.print("Thresholds          ");
+        lcd.print("pH/ORP settings     ");
     }
 
     // Helper lambda-style local: print one row from the 7-item list.
